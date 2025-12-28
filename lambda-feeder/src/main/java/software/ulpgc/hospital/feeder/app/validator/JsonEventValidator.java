@@ -1,5 +1,7 @@
-package software.ulpgc.hospital.feeder.validator;
+package software.ulpgc.hospital.feeder.app.validator;
 
+import software.ulpgc.hospital.feeder.domain.validator.EventValidator;
+import software.ulpgc.hospital.feeder.domain.validator.ValidationResult;
 import software.ulpgc.hospital.model.Event;
 import software.ulpgc.hospital.model.AdmissionEvent;
 import software.ulpgc.hospital.model.ConsultationEvent;

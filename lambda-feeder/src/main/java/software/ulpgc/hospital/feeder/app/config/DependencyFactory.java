@@ -1,11 +1,11 @@
-package software.ulpgc.hospital.feeder.config;
+package software.ulpgc.hospital.feeder.app.config;
 
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.sqs.SqsClient;
-import software.ulpgc.hospital.feeder.publisher.MessagePublisher;
-import software.ulpgc.hospital.feeder.publisher.SQSMessagePublisher;
-import software.ulpgc.hospital.feeder.validator.EventValidator;
-import software.ulpgc.hospital.feeder.validator.JsonEventValidator;
+import software.ulpgc.hospital.feeder.domain.publisher.MessagePublisher;
+import software.ulpgc.hospital.feeder.app.publisher.SQSMessagePublisher;
+import software.ulpgc.hospital.feeder.domain.validator.EventValidator;
+import software.ulpgc.hospital.feeder.app.validator.JsonEventValidator;
 import software.ulpgc.hospital.model.Event;
 import software.ulpgc.hospital.model.serialization.EventDeserializer;
 import software.ulpgc.hospital.model.serialization.EventSerializer;

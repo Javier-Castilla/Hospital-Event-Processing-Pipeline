@@ -1,4 +1,4 @@
-package software.ulpgc.hospital.feeder.publisher;
+package software.ulpgc.hospital.feeder.domain.publisher;
 
 public class PublishResult {
     private final String messageId;

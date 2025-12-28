@@ -1,14 +1,14 @@
-package software.ulpgc.hospital.feeder;
+package software.ulpgc.hospital.feeder.app;
 
 import com.amazonaws.services.lambda.runtime.Context;
 import com.amazonaws.services.lambda.runtime.RequestHandler;
 import com.amazonaws.services.lambda.runtime.events.APIGatewayProxyRequestEvent;
 import com.amazonaws.services.lambda.runtime.events.APIGatewayProxyResponseEvent;
-import software.ulpgc.hospital.feeder.config.DependencyFactory;
-import software.ulpgc.hospital.feeder.publisher.MessagePublisher;
-import software.ulpgc.hospital.feeder.publisher.PublishResult;
-import software.ulpgc.hospital.feeder.validator.EventValidator;
-import software.ulpgc.hospital.feeder.validator.ValidationResult;
+import software.ulpgc.hospital.feeder.app.config.DependencyFactory;
+import software.ulpgc.hospital.feeder.domain.publisher.MessagePublisher;
+import software.ulpgc.hospital.feeder.domain.publisher.PublishResult;
+import software.ulpgc.hospital.feeder.domain.validator.EventValidator;
+import software.ulpgc.hospital.feeder.domain.validator.ValidationResult;
 import software.ulpgc.hospital.model.Event;
 import software.ulpgc.hospital.model.serialization.EventDeserializer;
 import software.ulpgc.hospital.model.serialization.EventSerializer;

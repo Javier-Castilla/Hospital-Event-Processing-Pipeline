@@ -1,9 +1,12 @@
-package software.ulpgc.hospital.feeder.publisher;
+package software.ulpgc.hospital.feeder.app.publisher;
 
 import software.amazon.awssdk.services.sqs.SqsClient;
 import software.amazon.awssdk.services.sqs.model.SendMessageRequest;
 import software.amazon.awssdk.services.sqs.model.SendMessageResponse;
 import software.amazon.awssdk.services.sqs.model.SqsException;
+import software.ulpgc.hospital.feeder.domain.publisher.MessagePublisher;
+import software.ulpgc.hospital.feeder.domain.publisher.PublishException;
+import software.ulpgc.hospital.feeder.domain.publisher.PublishResult;
 
 public class SQSMessagePublisher implements MessagePublisher {
     private final SqsClient sqsClient;
