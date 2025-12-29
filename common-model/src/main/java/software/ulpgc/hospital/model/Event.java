@@ -6,4 +6,5 @@ import java.util.UUID;
 public interface Event {
     UUID getStreamId();
     Timestamp getTimestamp();
+    EventType getEventType();
 }

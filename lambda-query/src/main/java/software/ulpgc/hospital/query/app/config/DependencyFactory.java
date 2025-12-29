@@ -1,37 +1,37 @@
 package software.ulpgc.hospital.query.app.config;
 
-import software.ulpgc.hospital.query.app.query.GetAllEventsStrategy;
-import software.ulpgc.hospital.query.app.query.GetEventByIdStrategy;
-import software.ulpgc.hospital.query.app.query.StrategyQueryService;
-import software.ulpgc.hospital.query.app.repository.RepositoryFactory;
-import software.ulpgc.hospital.query.domain.query.QueryService;
-import software.ulpgc.hospital.query.domain.query.QueryStrategy;
+import software.amazon.awssdk.regions.Region;
+import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
+import software.amazon.awssdk.services.s3.S3Client;
+import software.ulpgc.hospital.app.implementation.serialization.JacksonEventDeserializer;
+import software.ulpgc.hospital.model.serialization.EventDeserializer;
+import software.ulpgc.hospital.query.app.repository.DynamoDatamartRepository;
+import software.ulpgc.hospital.query.app.repository.S3EventRepository;
+import software.ulpgc.hospital.query.domain.repository.DatamartRepository;
 import software.ulpgc.hospital.query.domain.repository.EventRepository;
-
-import java.util.HashMap;
-import java.util.Map;
 
 public class DependencyFactory {
     private static DependencyFactory instance;
-    private final QueryService queryService;
+    private final DatamartRepository datamartRepository;
+    private final EventRepository eventRepository;
 
     private DependencyFactory() {
-        String tableName = System.getenv("TABLE_NAME");
+        String datamartTable = System.getenv("DATAMART_TABLE");
+        String bucketName = System.getenv("BUCKET_NAME");
         String region = System.getenv("AWS_REGION");
-        String repoType = System.getenv("REPO_TYPE") != null ?
-                System.getenv("REPO_TYPE") : "dynamodb";
 
-        EventRepository repository = RepositoryFactory.createRepository(
-                repoType,
-                tableName,
-                region
-        );
+        DynamoDbClient dynamoClient = DynamoDbClient.builder()
+                .region(Region.of(region != null ? region : "us-east-1"))
+                .build();
 
-        Map<String, QueryStrategy> strategies = new HashMap<>();
-        strategies.put("getAll", new GetAllEventsStrategy(repository));
-        strategies.put("getById", new GetEventByIdStrategy(repository));
+        S3Client s3Client = S3Client.builder()
+                .region(Region.of(region != null ? region : "us-east-1"))
+                .build();
 
-        this.queryService = new StrategyQueryService(strategies);
+        EventDeserializer deserializer = new JacksonEventDeserializer();
+
+        this.datamartRepository = new DynamoDatamartRepository(dynamoClient, datamartTable);
+        this.eventRepository = new S3EventRepository(s3Client, bucketName, deserializer);
     }
 
     public static synchronized DependencyFactory getInstance() {
@@ -41,7 +41,11 @@ public class DependencyFactory {
         return instance;
     }
 
-    public QueryService getQueryService() {
-        return queryService;
+    public DatamartRepository getDatamartRepository() {
+        return datamartRepository;
+    }
+
+    public EventRepository getEventRepository() {
+        return eventRepository;
     }
 }

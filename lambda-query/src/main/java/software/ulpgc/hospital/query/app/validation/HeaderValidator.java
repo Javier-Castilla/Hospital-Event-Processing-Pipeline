@@ -8,9 +8,7 @@ public class HeaderValidator extends RequestValidator {
     @Override
     public void validate(APIGatewayProxyRequestEvent request) throws ValidationException {
         Map<String, String> headers = request.getHeaders();
-        if (headers == null) {
-            throw new ValidationException("Headers cannot be null");
-        }
+        if (headers == null) throw new ValidationException("Headers cannot be null");
         validateNext(request);
     }
 }

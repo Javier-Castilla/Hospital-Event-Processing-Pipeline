@@ -8,7 +8,6 @@ import software.ulpgc.hospital.ingest.app.storage.S3EventStorage;
 import software.ulpgc.hospital.ingest.domain.processor.EventProcessor;
 import software.ulpgc.hospital.ingest.domain.processor.SimpleEventProcessor;
 import software.ulpgc.hospital.ingest.domain.storage.EventStorage;
-import software.ulpgc.hospital.model.Event;
 import software.ulpgc.hospital.model.serialization.EventDeserializer;
 import software.ulpgc.hospital.model.serialization.EventSerializer;
 
@@ -22,7 +21,7 @@ public class DependencyFactory {
         String region = System.getenv("AWS_REGION");
 
         EventSerializer serializer = new JacksonEventSerializer();
-        EventDeserializer<Event> deserializer = new JacksonEventDeserializer<>(Event.class);
+        EventDeserializer deserializer = new JacksonEventDeserializer();
 
         S3Client s3Client = S3Client.builder()
                 .region(Region.of(region != null ? region : "us-east-1"))

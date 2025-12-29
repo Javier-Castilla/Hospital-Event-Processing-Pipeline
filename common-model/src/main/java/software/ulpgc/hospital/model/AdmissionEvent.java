@@ -14,6 +14,11 @@ public record AdmissionEvent(UUID id, Department department, AdmissionType admis
         return this.timestamp;
     }
 
+    @Override
+    public EventType getEventType() {
+        return EventType.ADMISSION;
+    }
+
     public enum AdmissionType {
         EMERGENCY,
         SCHEDULED,

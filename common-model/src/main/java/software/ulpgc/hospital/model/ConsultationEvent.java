@@ -4,14 +4,20 @@ import java.sql.Timestamp;
 import java.util.UUID;
 
 public record ConsultationEvent(UUID id, Department department, ConsultationType consultationType, Integer durationMinutes, Timestamp timestamp) implements Event {
+
     @Override
     public UUID getStreamId() {
-        return null;
+        return this.id;
     }
 
     @Override
     public Timestamp getTimestamp() {
-        return null;
+        return this.timestamp;
+    }
+
+    @Override
+    public EventType getEventType() {
+        return EventType.CONSULTATION;
     }
 
     public enum ConsultationType {

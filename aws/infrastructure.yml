@@ -1,0 +1,347 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Hospital Event Processing Pipeline - Dual Query Architecture'
+
+Parameters:
+  Environment:
+    Type: String
+    Default: dev
+    Description: Environment name
+
+  DataLakeBucketName:
+    Type: String
+    Description: Existing S3 DataLake bucket name
+
+Resources:
+  # DynamoDB Datamart Table (Agregaciones)
+  DatamartTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub '${AWS::StackName}-datamart'
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: pk
+          AttributeType: S
+        - AttributeName: sk
+          AttributeType: S
+      KeySchema:
+        - AttributeName: pk
+          KeyType: HASH
+        - AttributeName: sk
+          KeyType: RANGE
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+
+  # SQS Queue
+  EventQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub '${AWS::StackName}-event-queue'
+      VisibilityTimeout: 300
+      MessageRetentionPeriod: 345600
+      ReceiveMessageWaitTimeSeconds: 20
+      RedrivePolicy:
+        deadLetterTargetArn: !GetAtt DeadLetterQueue.Arn
+        maxReceiveCount: 3
+
+  DeadLetterQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub '${AWS::StackName}-dlq'
+      MessageRetentionPeriod: 1209600
+
+  # Lambda Feeder
+  LambdaFeeder:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub '${AWS::StackName}-feeder'
+      Runtime: java21
+      Handler: software.ulpgc.hospital.feeder.app.FeederHandler::handleRequest
+      Role: !Sub 'arn:aws:iam::${AWS::AccountId}:role/LabRole'
+      Code:
+        S3Bucket: !Ref DataLakeBucketName
+        S3Key: scripts/lambda-feeder.jar
+      Timeout: 60
+      MemorySize: 512
+      Environment:
+        Variables:
+          QUEUE_URL: !Ref EventQueue
+
+  # Lambda Ingest
+  LambdaIngest:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub '${AWS::StackName}-ingest'
+      Runtime: java21
+      Handler: software.ulpgc.hospital.ingest.app.IngestHandler::handleRequest
+      Role: !Sub 'arn:aws:iam::${AWS::AccountId}:role/LabRole'
+      Code:
+        S3Bucket: !Ref DataLakeBucketName
+        S3Key: scripts/lambda-ingest.jar
+      Timeout: 60
+      MemorySize: 512
+      Environment:
+        Variables:
+          BUCKET_NAME: !Ref DataLakeBucketName
+
+  LambdaIngestEventSourceMapping:
+    Type: AWS::Lambda::EventSourceMapping
+    Properties:
+      EventSourceArn: !GetAtt EventQueue.Arn
+      FunctionName: !Ref LambdaIngest
+      BatchSize: 10
+      MaximumBatchingWindowInSeconds: 5
+
+  # Lambda Mounter (Lee de S3 raw/, escribe en DynamoDB)
+  LambdaMounter:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub '${AWS::StackName}-mounter'
+      Runtime: java21
+      Handler: software.ulpgc.hospital.mounter.app.MounterHandler::handleRequest
+      Role: !Sub 'arn:aws:iam::${AWS::AccountId}:role/LabRole'
+      Code:
+        S3Bucket: !Ref DataLakeBucketName
+        S3Key: scripts/lambda-mounter.jar
+      Timeout: 60
+      MemorySize: 512
+      Environment:
+        Variables:
+          BUCKET_NAME: !Ref DataLakeBucketName
+          TABLE_NAME: !Ref DatamartTable
+
+  LambdaMounterPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref LambdaMounter
+      Action: lambda:InvokeFunction
+      Principal: s3.amazonaws.com
+      SourceAccount: !Ref AWS::AccountId
+      SourceArn: !Sub 'arn:aws:s3:::${DataLakeBucketName}'
+
+  # Lambda Query (Lee de DynamoDB o S3 según endpoint)
+  LambdaQuery:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub '${AWS::StackName}-query'
+      Runtime: java21
+      Handler: software.ulpgc.hospital.query.app.QueryHandler::handleRequest
+      Role: !Sub 'arn:aws:iam::${AWS::AccountId}:role/LabRole'
+      Code:
+        S3Bucket: !Ref DataLakeBucketName
+        S3Key: scripts/lambda-query.jar
+      Timeout: 30
+      MemorySize: 512
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref DatamartTable
+          BUCKET_NAME: !Ref DataLakeBucketName
+
+  # REST API Gateway
+  RestApiGateway:
+    Type: AWS::ApiGateway::RestApi
+    Properties:
+      Name: !Sub '${AWS::StackName}-rest-api'
+      Description: 'Hospital Event Processing REST API'
+      EndpointConfiguration:
+        Types:
+          - REGIONAL
+
+  # API Key
+  ApiKey:
+    Type: AWS::ApiGateway::ApiKey
+    DependsOn: ApiDeployment
+    Properties:
+      Name: !Sub '${AWS::StackName}-api-key'
+      Description: 'API Key for Hospital Event Pipeline'
+      Enabled: true
+
+  # Usage Plan
+  UsagePlan:
+    Type: AWS::ApiGateway::UsagePlan
+    DependsOn: ApiDeployment
+    Properties:
+      UsagePlanName: !Sub '${AWS::StackName}-usage-plan'
+      Description: 'Usage plan for Hospital Event API'
+      ApiStages:
+        - ApiId: !Ref RestApiGateway
+          Stage: !Ref ApiStage
+      Throttle:
+        RateLimit: 1000
+        BurstLimit: 2000
+
+  UsagePlanKey:
+    Type: AWS::ApiGateway::UsagePlanKey
+    Properties:
+      KeyId: !Ref ApiKey
+      KeyType: API_KEY
+      UsagePlanId: !Ref UsagePlan
+
+  # Resources
+  EventsResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref RestApiGateway
+      ParentId: !GetAtt RestApiGateway.RootResourceId
+      PathPart: events
+
+  StatsResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref RestApiGateway
+      ParentId: !GetAtt RestApiGateway.RootResourceId
+      PathPart: stats
+
+  # POST /events
+  PostEventMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref RestApiGateway
+      ResourceId: !Ref EventsResource
+      HttpMethod: POST
+      AuthorizationType: NONE
+      ApiKeyRequired: true
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${LambdaFeeder.Arn}/invocations'
+
+  # GET /events (S3 Raw Events)
+  GetEventsMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref RestApiGateway
+      ResourceId: !Ref EventsResource
+      HttpMethod: GET
+      AuthorizationType: NONE
+      ApiKeyRequired: true
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${LambdaQuery.Arn}/invocations'
+
+  # GET /stats (DynamoDB Aggregations)
+  GetStatsMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref RestApiGateway
+      ResourceId: !Ref StatsResource
+      HttpMethod: GET
+      AuthorizationType: NONE
+      ApiKeyRequired: true
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${LambdaQuery.Arn}/invocations'
+
+  # OPTIONS CORS
+  OptionsEventsMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref RestApiGateway
+      ResourceId: !Ref EventsResource
+      HttpMethod: OPTIONS
+      AuthorizationType: NONE
+      Integration:
+        Type: MOCK
+        IntegrationResponses:
+          - StatusCode: 200
+            ResponseParameters:
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Api-Key'"
+              method.response.header.Access-Control-Allow-Methods: "'GET,POST,OPTIONS'"
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
+      MethodResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: true
+            method.response.header.Access-Control-Allow-Methods: true
+            method.response.header.Access-Control-Allow-Origin: true
+
+  OptionsStatsMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref RestApiGateway
+      ResourceId: !Ref StatsResource
+      HttpMethod: OPTIONS
+      AuthorizationType: NONE
+      Integration:
+        Type: MOCK
+        IntegrationResponses:
+          - StatusCode: 200
+            ResponseParameters:
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Api-Key'"
+              method.response.header.Access-Control-Allow-Methods: "'GET,OPTIONS'"
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
+      MethodResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: true
+            method.response.header.Access-Control-Allow-Methods: true
+            method.response.header.Access-Control-Allow-Origin: true
+
+  # Lambda Permissions
+  LambdaFeederPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref LambdaFeeder
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${RestApiGateway}/*'
+
+  LambdaQueryPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref LambdaQuery
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${RestApiGateway}/*'
+
+  # Deployment
+  ApiDeployment:
+    Type: AWS::ApiGateway::Deployment
+    DependsOn:
+      - PostEventMethod
+      - GetEventsMethod
+      - GetStatsMethod
+      - OptionsEventsMethod
+      - OptionsStatsMethod
+    Properties:
+      RestApiId: !Ref RestApiGateway
+      Description: 'Dual Query Architecture Deployment'
+
+  ApiStage:
+    Type: AWS::ApiGateway::Stage
+    Properties:
+      RestApiId: !Ref RestApiGateway
+      DeploymentId: !Ref ApiDeployment
+      StageName: prod
+      Description: 'Production stage'
+
+Outputs:
+  DataLakeBucketName:
+    Description: Data Lake S3 bucket name
+    Value: !Ref DataLakeBucketName
+
+  DatamartTableName:
+    Description: Datamart DynamoDB table name
+    Value: !Ref DatamartTable
+
+  EventQueueUrl:
+    Description: SQS Queue URL
+    Value: !Ref EventQueue
+
+  ApiEndpoint:
+    Description: REST API Gateway endpoint URL
+    Value: !Sub 'https://${RestApiGateway}.execute-api.${AWS::Region}.amazonaws.com/prod'
+
+  ApiKeyId:
+    Description: API Key ID
+    Value: !Ref ApiKey
+
+  LambdaMounterName:
+    Description: Lambda Mounter function name
+    Value: !Ref LambdaMounter

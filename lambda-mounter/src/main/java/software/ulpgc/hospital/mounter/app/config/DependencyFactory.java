@@ -1,41 +1,32 @@
 package software.ulpgc.hospital.mounter.app.config;
 
-import software.amazon.awssdk.regions.Region;
-import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 import software.ulpgc.hospital.app.implementation.serialization.JacksonEventDeserializer;
-import software.ulpgc.hospital.model.Event;
 import software.ulpgc.hospital.model.serialization.EventDeserializer;
-import software.ulpgc.hospital.mounter.app.processor.ETLDataProcessor;
-import software.ulpgc.hospital.mounter.app.repository.DynamoDatamartWriter;
+import software.ulpgc.hospital.mounter.app.processor.SimpleDataProcessor;
 import software.ulpgc.hospital.mounter.app.repository.S3EventReader;
-import software.ulpgc.hospital.mounter.domain.repository.DatamartWriter;
-import software.ulpgc.hospital.mounter.domain.repository.EventReader;
+import software.ulpgc.hospital.mounter.app.repository.DynamoDatamartRepository;
+import software.ulpgc.hospital.mounter.domain.processor.DataProcessor;
 
 public class DependencyFactory {
+
     private static DependencyFactory instance;
-    private final ETLDataProcessor dataProcessor;
+    private final DataProcessor dataProcessor;
 
     private DependencyFactory() {
         String bucketName = System.getenv("BUCKET_NAME");
         String tableName = System.getenv("TABLE_NAME");
-        String region = System.getenv("AWS_REGION");
 
-        EventDeserializer deserializer = new JacksonEventDeserializer<>(Event.class);
+        S3Client s3Client = S3Client.builder().build();
+        DynamoDbClient dynamoClient = DynamoDbClient.builder().build();
 
-        S3Client s3Client = S3Client.builder()
-                .region(Region.of(region != null ? region : "us-east-1"))
-                .build();
+        EventDeserializer deserializer = new JacksonEventDeserializer();
 
-        DynamoDbClient dynamoClient = DynamoDbClient.builder()
-                .region(Region.of(region != null ? region : "us-east-1"))
-                .build();
+        S3EventReader reader = new S3EventReader(s3Client, bucketName, deserializer);
+        DynamoDatamartRepository writer = new DynamoDatamartRepository(dynamoClient, tableName);
 
-        EventReader reader = new S3EventReader(s3Client, bucketName, deserializer);
-        DatamartWriter writer = new DynamoDatamartWriter(dynamoClient, tableName);
-
-        // Usar Template Method Pattern
-        this.dataProcessor = new ETLDataProcessor(reader, writer);
+        this.dataProcessor = new SimpleDataProcessor(reader, writer);
     }
 
     public static synchronized DependencyFactory getInstance() {
@@ -45,7 +36,7 @@ public class DependencyFactory {
         return instance;
     }
 
-    public ETLDataProcessor getDataProcessor() {
+    public DataProcessor getDataProcessor() {
         return dataProcessor;
     }
 }

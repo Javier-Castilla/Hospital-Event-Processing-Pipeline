@@ -5,11 +5,14 @@ import com.amazonaws.services.lambda.runtime.RequestHandler;
 import com.amazonaws.services.lambda.runtime.events.S3Event;
 import com.amazonaws.services.lambda.runtime.events.models.s3.S3EventNotification;
 import software.ulpgc.hospital.mounter.app.config.DependencyFactory;
-import software.ulpgc.hospital.mounter.app.processor.ETLDataProcessor;
+import software.ulpgc.hospital.mounter.domain.processor.DataProcessor;
 import software.ulpgc.hospital.mounter.domain.processor.ProcessResult;
 
+import java.io.PrintWriter;
+import java.io.StringWriter;
+
 public class MounterHandler implements RequestHandler<S3Event, Void> {
-    private final ETLDataProcessor dataProcessor;
+    private final DataProcessor dataProcessor;
 
     public MounterHandler() {
         DependencyFactory factory = DependencyFactory.getInstance();
@@ -25,8 +28,7 @@ public class MounterHandler implements RequestHandler<S3Event, Void> {
                 String s3Key = record.getS3().getObject().getKey();
                 context.getLogger().log("Processing S3 object: " + s3Key);
 
-                // Usar Template Method Pattern
-                ProcessResult result = dataProcessor.processEvent(s3Key);
+                ProcessResult result = dataProcessor.process(s3Key);
 
                 if (result.isSuccess()) {
                     context.getLogger().log("Successfully processed event " + result.getEventId() +
@@ -35,10 +37,30 @@ public class MounterHandler implements RequestHandler<S3Event, Void> {
                     context.getLogger().log("Failed to process event from: " + s3Key);
                 }
             } catch (Exception e) {
-                context.getLogger().log("Error processing S3 event: " + e.getMessage());
+                context.getLogger().log("=== ERROR PROCESSING S3 EVENT ===");
+                context.getLogger().log("Error message: " + e.getMessage());
+                context.getLogger().log("Exception type: " + e.getClass().getName());
+                context.getLogger().log("Full stack trace:");
+                context.getLogger().log(getStackTrace(e));
+
+                if (e.getCause() != null) {
+                    context.getLogger().log("=== CAUSED BY ===");
+                    context.getLogger().log("Cause type: " + e.getCause().getClass().getName());
+                    context.getLogger().log("Cause message: " + e.getCause().getMessage());
+                    context.getLogger().log("Cause stack trace:");
+                    context.getLogger().log(getStackTrace(e.getCause()));
+                }
+                context.getLogger().log("=== END ERROR ===");
             }
         }
 
         return null;
+    }
+
+    private String getStackTrace(Throwable e) {
+        StringWriter sw = new StringWriter();
+        PrintWriter pw = new PrintWriter(sw);
+        e.printStackTrace(pw);
+        return sw.toString();
     }
 }
