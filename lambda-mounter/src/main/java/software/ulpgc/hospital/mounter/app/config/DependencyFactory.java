@@ -6,16 +6,15 @@ import software.amazon.awssdk.services.s3.S3Client;
 import software.ulpgc.hospital.app.implementation.serialization.JacksonEventDeserializer;
 import software.ulpgc.hospital.model.Event;
 import software.ulpgc.hospital.model.serialization.EventDeserializer;
-import software.ulpgc.hospital.mounter.app.processor.SimpleDataProcessor;
+import software.ulpgc.hospital.mounter.app.processor.ETLDataProcessor;
 import software.ulpgc.hospital.mounter.app.repository.DynamoDatamartWriter;
 import software.ulpgc.hospital.mounter.app.repository.S3EventReader;
-import software.ulpgc.hospital.mounter.domain.processor.DataProcessor;
 import software.ulpgc.hospital.mounter.domain.repository.DatamartWriter;
 import software.ulpgc.hospital.mounter.domain.repository.EventReader;
 
 public class DependencyFactory {
     private static DependencyFactory instance;
-    private final DataProcessor dataProcessor;
+    private final ETLDataProcessor dataProcessor;
 
     private DependencyFactory() {
         String bucketName = System.getenv("BUCKET_NAME");
@@ -35,7 +34,8 @@ public class DependencyFactory {
         EventReader reader = new S3EventReader(s3Client, bucketName, deserializer);
         DatamartWriter writer = new DynamoDatamartWriter(dynamoClient, tableName);
 
-        this.dataProcessor = new SimpleDataProcessor(reader, writer);
+        // Usar Template Method Pattern
+        this.dataProcessor = new ETLDataProcessor(reader, writer);
     }
 
     public static synchronized DependencyFactory getInstance() {
@@ -45,7 +45,7 @@ public class DependencyFactory {
         return instance;
     }
 
-    public DataProcessor getDataProcessor() {
+    public ETLDataProcessor getDataProcessor() {
         return dataProcessor;
     }
 }

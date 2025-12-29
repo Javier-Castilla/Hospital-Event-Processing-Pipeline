@@ -5,11 +5,11 @@ import com.amazonaws.services.lambda.runtime.RequestHandler;
 import com.amazonaws.services.lambda.runtime.events.S3Event;
 import com.amazonaws.services.lambda.runtime.events.models.s3.S3EventNotification;
 import software.ulpgc.hospital.mounter.app.config.DependencyFactory;
-import software.ulpgc.hospital.mounter.domain.processor.DataProcessor;
+import software.ulpgc.hospital.mounter.app.processor.ETLDataProcessor;
 import software.ulpgc.hospital.mounter.domain.processor.ProcessResult;
 
 public class MounterHandler implements RequestHandler<S3Event, Void> {
-    private final DataProcessor dataProcessor;
+    private final ETLDataProcessor dataProcessor;
 
     public MounterHandler() {
         DependencyFactory factory = DependencyFactory.getInstance();
@@ -25,7 +25,8 @@ public class MounterHandler implements RequestHandler<S3Event, Void> {
                 String s3Key = record.getS3().getObject().getKey();
                 context.getLogger().log("Processing S3 object: " + s3Key);
 
-                ProcessResult result = dataProcessor.process(s3Key);
+                // Usar Template Method Pattern
+                ProcessResult result = dataProcessor.processEvent(s3Key);
 
                 if (result.isSuccess()) {
                     context.getLogger().log("Successfully processed event " + result.getEventId() +
