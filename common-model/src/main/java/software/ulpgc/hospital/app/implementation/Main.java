@@ -1,10 +1,10 @@
-package software.ulpgc.hospital.app.windows;
+package software.ulpgc.hospital.app.implementation;
 
 import software.ulpgc.hospital.model.AdmissionEvent;
 import software.ulpgc.hospital.model.Department;
 import software.ulpgc.hospital.model.Event;
 import software.ulpgc.hospital.model.builders.AdmissionEventBuilder;
-import software.ulpgc.hospital.app.windows.serialization.JacksonEventSerializer;
+import software.ulpgc.hospital.app.implementation.serialization.JacksonEventSerializer;
 import software.ulpgc.hospital.model.serialization.SerializationException;
 
 import java.sql.Timestamp;

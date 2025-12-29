@@ -2,8 +2,8 @@ package software.ulpgc.hospital.ingest.app.config;
 
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
-import software.ulpgc.hospital.app.windows.serialization.JacksonEventDeserializer;
-import software.ulpgc.hospital.app.windows.serialization.JacksonEventSerializer;
+import software.ulpgc.hospital.app.implementation.serialization.JacksonEventDeserializer;
+import software.ulpgc.hospital.app.implementation.serialization.JacksonEventSerializer;
 import software.ulpgc.hospital.ingest.app.storage.S3EventStorage;
 import software.ulpgc.hospital.ingest.domain.processor.EventProcessor;
 import software.ulpgc.hospital.ingest.domain.processor.SimpleEventProcessor;

@@ -9,8 +9,8 @@ import software.ulpgc.hospital.feeder.app.validator.JsonEventValidator;
 import software.ulpgc.hospital.model.Event;
 import software.ulpgc.hospital.model.serialization.EventDeserializer;
 import software.ulpgc.hospital.model.serialization.EventSerializer;
-import software.ulpgc.hospital.app.windows.serialization.JacksonEventDeserializer;
-import software.ulpgc.hospital.app.windows.serialization.JacksonEventSerializer;
+import software.ulpgc.hospital.app.implementation.serialization.JacksonEventDeserializer;
+import software.ulpgc.hospital.app.implementation.serialization.JacksonEventSerializer;
 
 public class DependencyFactory {
     private static DependencyFactory instance;

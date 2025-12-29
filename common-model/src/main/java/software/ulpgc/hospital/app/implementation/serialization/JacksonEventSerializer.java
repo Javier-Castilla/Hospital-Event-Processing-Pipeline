@@ -1,4 +1,4 @@
-package software.ulpgc.hospital.app.windows.serialization;
+package software.ulpgc.hospital.app.implementation.serialization;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
