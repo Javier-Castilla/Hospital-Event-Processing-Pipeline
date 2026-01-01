@@ -134,7 +134,7 @@ Resources:
       MemorySize: 512
       Environment:
         Variables:
-          TABLE_NAME: !Ref DatamartTable
+          DATAMART_TABLE: !Ref DatamartTable
           BUCKET_NAME: !Ref DataLakeBucketName
 
   # REST API Gateway
@@ -191,6 +191,57 @@ Resources:
       RestApiId: !Ref RestApiGateway
       ParentId: !GetAtt RestApiGateway.RootResourceId
       PathPart: stats
+
+  # /stats/{id} Resource
+  StatsIdResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref RestApiGateway
+      ParentId: !Ref StatsResource
+      PathPart: '{id}'
+
+  # GET /stats/{id}
+  GetStatsByIdMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref RestApiGateway
+      ResourceId: !Ref StatsIdResource
+      HttpMethod: GET
+      AuthorizationType: NONE
+      ApiKeyRequired: true
+      RequestParameters:
+        method.request.path.id: true
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${LambdaQuery.Arn}/invocations'
+        RequestParameters:
+          integration.request.path.id: method.request.path.id
+
+  # OPTIONS /stats/{id} (CORS)
+  OptionsStatsByIdMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref RestApiGateway
+      ResourceId: !Ref StatsIdResource
+      HttpMethod: OPTIONS
+      AuthorizationType: NONE
+      Integration:
+        Type: MOCK
+        IntegrationResponses:
+          - StatusCode: 200
+            ResponseParameters:
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Api-Key'"
+              method.response.header.Access-Control-Allow-Methods: "'GET,OPTIONS'"
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
+      MethodResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: true
+            method.response.header.Access-Control-Allow-Methods: true
+            method.response.header.Access-Control-Allow-Origin: true
 
   # POST /events
   PostEventMethod:
@@ -307,11 +358,14 @@ Resources:
       - PostEventMethod
       - GetEventsMethod
       - GetStatsMethod
+      - GetStatsByIdMethod
       - OptionsEventsMethod
       - OptionsStatsMethod
+      - OptionsStatsByIdMethod
     Properties:
       RestApiId: !Ref RestApiGateway
       Description: 'Dual Query Architecture Deployment'
+
 
   ApiStage:
     Type: AWS::ApiGateway::Stage
