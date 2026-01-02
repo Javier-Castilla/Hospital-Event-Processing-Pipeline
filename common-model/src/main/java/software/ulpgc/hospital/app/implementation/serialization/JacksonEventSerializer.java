@@ -11,9 +11,7 @@ public class JacksonEventSerializer implements EventSerializer {
     private final ObjectMapper mapper;
 
     public JacksonEventSerializer() {
-        this.mapper = new ObjectMapper();
-        this.mapper.registerModule(new JavaTimeModule());
-        this.mapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
+        this(defaultMapper());
     }
 
     public JacksonEventSerializer(ObjectMapper mapper) {
@@ -27,5 +25,12 @@ public class JacksonEventSerializer implements EventSerializer {
         } catch (Exception e) {
             throw new SerializationException("Failed to serialize event: " + event.getStreamId(), e);
         }
+    }
+
+    private static ObjectMapper defaultMapper() {
+        ObjectMapper mapper = new ObjectMapper();
+        mapper.registerModule(new JavaTimeModule());
+        mapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
+        return mapper;
     }
 }

@@ -11,7 +11,7 @@ import software.ulpgc.hospital.model.Event;
 import software.ulpgc.hospital.model.serialization.EventSerializer;
 
 import java.time.LocalDate;
-import java.time.ZoneId;
+import java.time.ZoneOffset;
 
 public class S3EventStorage implements EventStorage {
     private final S3Client s3Client;
@@ -26,23 +26,28 @@ public class S3EventStorage implements EventStorage {
 
     @Override
     public StorageResult store(Event event) throws StorageException {
+        String key = buildS3Key(event);
+        String location = String.format("s3://%s/%s", bucketName, key);
+
         try {
             String eventJson = serializer.serialize(event);
-            String key = buildS3Key(event);
 
             PutObjectRequest putRequest = PutObjectRequest.builder()
                     .bucket(bucketName)
                     .key(key)
                     .contentType("application/json")
+                    .ifNoneMatch("*")
                     .build();
 
             s3Client.putObject(putRequest, RequestBody.fromString(eventJson));
-
-            String location = String.format("s3://%s/%s", bucketName, key);
             return new StorageResult(location, true);
 
         } catch (S3Exception e) {
+            if (e.statusCode() == 412) {
+                return new StorageResult(location, false);
+            }
             throw new StorageException("Failed to store event in S3: " + e.getMessage(), e);
+
         } catch (Exception e) {
             throw new StorageException("Unexpected error storing event", e);
         }
@@ -51,15 +56,12 @@ public class S3EventStorage implements EventStorage {
     private String buildS3Key(Event event) {
         LocalDate date = event.getTimestamp()
                 .toInstant()
-                .atZone(ZoneId.systemDefault())
+                .atZone(ZoneOffset.UTC)
                 .toLocalDate();
 
         String eventType = event.getClass().getSimpleName().replace("Event", "").toUpperCase();
-        String year = String.valueOf(date.getYear());
-        String month = String.format("%02d", date.getMonthValue());
-        String day = String.format("%02d", date.getDayOfMonth());
 
-        return String.format("raw/%s/%s/%s/%s/%s.json",
-                eventType, year, month, day, event.getStreamId());
+        return String.format("raw/eventType=%s/date=%s/%s.json",
+                eventType, date, event.getStreamId());
     }
 }

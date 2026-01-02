@@ -1,24 +1,21 @@
-package software.ulpgc.hospital.feeder.app.validator.rules;
+package software.ulpgc.hospital.feeder.domain.validation.consultationRules;
 
-import software.ulpgc.hospital.feeder.app.validator.ValidationRule;
+import software.ulpgc.hospital.feeder.domain.validation.ValidationRule;
 import software.ulpgc.hospital.feeder.domain.validation.ValidationResult;
 import software.ulpgc.hospital.model.ConsultationEvent;
 
-public class ConsultationDetailsNotNullRule extends ValidationRule {
-    private final ConsultationEvent event;
-
-    private ConsultationDetailsNotNullRule(ConsultationEvent event) {
-        this.event = event;
+public class ConsultationDetailsNotNullRule extends ValidationRule<ConsultationEvent> {
+    private ConsultationDetailsNotNullRule() {
     }
 
-    public static ConsultationDetailsNotNullRule of(ConsultationEvent event) {
-        return new ConsultationDetailsNotNullRule(event);
+    public static ConsultationDetailsNotNullRule create() {
+        return new ConsultationDetailsNotNullRule();
     }
 
     @Override
-    protected ValidationResult check() {
-        return event.consultation() == null
-            ? ValidationResult.failure("Consultation details cannot be null")
-            : ValidationResult.success();
+    protected ValidationResult check(ConsultationEvent event) {
+        return event.consultationDetails() == null
+                ? ValidationResult.failure("Consultation details cannot be null")
+                : ValidationResult.success();
     }
 }

@@ -1,4 +1,34 @@
 package software.ulpgc.hospital.query.domain.control;
 
-public class GetStatsByIdCommand {
+import software.ulpgc.hospital.model.DepartmentStats;
+import software.ulpgc.hospital.query.domain.repository.DatamartRepository;
+import software.ulpgc.hospital.query.domain.repository.RepositoryException;
+
+public class GetStatsByIdCommand implements Command {
+    private final Input input;
+    private final Output output;
+    private final DatamartRepository datamartRepository;
+
+    public GetStatsByIdCommand(Input input, Output output, DatamartRepository datamartRepository) {
+        this.input = input;
+        this.output = output;
+        this.datamartRepository = datamartRepository;
+    }
+
+    @Override
+    public Response execute() {
+        try {
+            return this.output.result(this.datamartRepository.findById(this.input.id()));
+        } catch (RepositoryException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public interface Input {
+        String id();
+    }
+
+    public interface Output {
+        Response result(DepartmentStats departmentStats);
+    }
 }

@@ -3,7 +3,13 @@ package software.ulpgc.hospital.model;
 import java.sql.Timestamp;
 import java.util.UUID;
 
-public record AdmissionEvent(UUID id, Department department, AdmissionType admissionType, String bedNumber, Timestamp timestamp) implements Event {
+public record AdmissionEvent(
+        UUID id,
+        PatientSnapshot patient,
+        AdmissionDetails admissionDetails,
+        Timestamp timestamp
+) implements Event {
+
     @Override
     public UUID getStreamId() {
         return this.id;
@@ -18,6 +24,15 @@ public record AdmissionEvent(UUID id, Department department, AdmissionType admis
     public EventType getEventType() {
         return EventType.ADMISSION;
     }
+
+    public record AdmissionDetails(
+            Department department,
+            AdmissionType admissionType,
+            String bedNumber,
+            String ward,
+            String attendingPhysician,
+            String initialDiagnosis
+    ) {}
 
     public enum AdmissionType {
         EMERGENCY,

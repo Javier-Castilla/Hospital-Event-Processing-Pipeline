@@ -94,7 +94,7 @@ public class S3EventRepository implements EventRepository {
         }
 
         if (filters.containsKey("department") && event instanceof AdmissionEvent admission) {
-            return admission.department().name().equalsIgnoreCase(filters.get("department"));
+            return admission.admissionDetails().department().name().equalsIgnoreCase(filters.get("department"));
         }
 
         return true;

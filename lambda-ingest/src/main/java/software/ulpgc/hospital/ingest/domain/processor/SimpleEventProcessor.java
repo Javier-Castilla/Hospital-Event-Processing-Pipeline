@@ -6,10 +6,10 @@ import software.ulpgc.hospital.model.Event;
 import software.ulpgc.hospital.model.serialization.EventDeserializer;
 
 public class SimpleEventProcessor implements EventProcessor {
-    private final EventDeserializer<Event> deserializer;
+    private final EventDeserializer deserializer;
     private final EventStorage storage;
 
-    public SimpleEventProcessor(EventDeserializer<Event> deserializer, EventStorage storage) {
+    public SimpleEventProcessor(EventDeserializer deserializer, EventStorage storage) {
         this.deserializer = deserializer;
         this.storage = storage;
     }

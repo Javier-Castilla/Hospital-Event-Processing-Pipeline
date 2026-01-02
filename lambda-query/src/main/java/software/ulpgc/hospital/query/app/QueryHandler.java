@@ -5,20 +5,19 @@ import com.amazonaws.services.lambda.runtime.RequestHandler;
 import com.amazonaws.services.lambda.runtime.events.APIGatewayProxyRequestEvent;
 import com.amazonaws.services.lambda.runtime.events.APIGatewayProxyResponseEvent;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import software.ulpgc.hospital.model.DepartmentStats;
-import software.ulpgc.hospital.model.Event;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import software.ulpgc.hospital.query.app.adapters.GetStatsByIdAdapter;
+import software.ulpgc.hospital.query.app.adapters.QueryEventsAdapter;
+import software.ulpgc.hospital.query.app.adapters.QueryStatsAdapter;
+import software.ulpgc.hospital.query.app.config.CommandFactory;
 import software.ulpgc.hospital.query.app.config.DependencyFactory;
-import software.ulpgc.hospital.query.app.validation.HeaderValidator;
-import software.ulpgc.hospital.query.app.validation.MethodValidator;
-import software.ulpgc.hospital.query.app.validation.PathValidator;
-import software.ulpgc.hospital.query.app.validation.RequestValidator;
-import software.ulpgc.hospital.query.app.validation.ValidationException;
+import software.ulpgc.hospital.query.app.validation.*;
+import software.ulpgc.hospital.query.domain.control.*;
 import software.ulpgc.hospital.query.domain.repository.DatamartRepository;
 import software.ulpgc.hospital.query.domain.repository.EventRepository;
-import software.ulpgc.hospital.query.domain.repository.RepositoryException;
 
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 public class QueryHandler implements RequestHandler<APIGatewayProxyRequestEvent, APIGatewayProxyResponseEvent> {
@@ -26,61 +25,71 @@ public class QueryHandler implements RequestHandler<APIGatewayProxyRequestEvent,
     private final EventRepository eventRepository;
     private final ObjectMapper objectMapper;
     private final RequestValidator validationChain;
+    private final CommandFactory commandFactory;
 
     public QueryHandler() {
         DependencyFactory factory = DependencyFactory.getInstance();
         this.datamartRepository = factory.getDatamartRepository();
         this.eventRepository = factory.getEventRepository();
         this.objectMapper = new ObjectMapper();
+        this.objectMapper.registerModule(new JavaTimeModule());
+        this.objectMapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
         this.validationChain = new PathValidator();
         validationChain.setNext(new MethodValidator())
-                .setNext(new HeaderValidator());
+                .setNext(new HeaderValidator())
+                .setNext(new QueryValidator());
+        this.commandFactory = createCommandFactory();
     }
 
     @Override
     public APIGatewayProxyResponseEvent handleRequest(APIGatewayProxyRequestEvent request, Context context) {
-        context.getLogger().log("Processing query: " + request.getPath());
         try {
             validationChain.validate(request);
-            String path = request.getPath();
-
-            if (path.startsWith("/stats/")) {
-                String id = path.substring("/stats/".length());
-                DepartmentStats stats = datamartRepository.findById(id);
-                return createResponse(200, stats);
-
-            } else if (path.equals("/stats")) {
-                Map<String, String> filters = request.getQueryStringParameters();
-                if (filters == null) {
-                    filters = new HashMap<>();
-                }
-
-                List<DepartmentStats> results = datamartRepository.query(filters);
-                return createResponse(200, Map.of("data", results, "count", results.size()));
-
-            } else if (path.equals("/events")) {
-                Map<String, String> filters = request.getQueryStringParameters();
-                if (filters == null) {
-                    filters = new HashMap<>();
-                }
-
-                List<Event> events = eventRepository.query(filters);
-                return createResponse(200, Map.of("events", events, "count", events.size()));
-
-            } else {
-                return createResponse(404, Map.of("error", "Not found"));
-            }
-
+            String commandKey = request.getHttpMethod() + ":" + request.getResource();
+            Response emptyResponse = new Response(200, "OK", null);
+            Response response = commandFactory.with(request, emptyResponse).build(commandKey).execute();
+            return createResponse(response.code(), response.result());
         } catch (ValidationException e) {
             context.getLogger().log("Validation error: " + e.getMessage());
             return createResponse(400, Map.of("error", e.getMessage()));
-        } catch (RepositoryException e) {
-            context.getLogger().log("Repository error: " + e.getMessage());
-            return createResponse(404, Map.of("error", e.getMessage()));
         } catch (Exception e) {
-            context.getLogger().log("Error processing request: " + e.getMessage());
+            context.getLogger().log("Error: " + e.getMessage());
             return createResponse(500, Map.of("error", "Internal server error"));
         }
+    }
+
+    private CommandFactory createCommandFactory() {
+        return CommandFactory.create()
+                .register("GET:/events", createQueryEventsCommand())
+                .register("GET:/stats", createQueryStatsCommand())
+                .register("GET:/stats/{id}", createGetStatsByIdCommand());
+    }
+
+    private CommandFactory.Builder createGetStatsByIdCommand() {
+        return (request, response) ->
+                new GetStatsByIdCommand(
+                        GetStatsByIdAdapter.adapt(request),
+                        GetStatsByIdAdapter.adaptedOutput(),
+                        datamartRepository
+                );
+    }
+
+    private CommandFactory.Builder createQueryStatsCommand() {
+        return (request, response) ->
+                new QueryStatsCommand(
+                        QueryStatsAdapter.adapt(request),
+                        QueryStatsAdapter.adaptedOutput(),
+                        datamartRepository
+                );
+    }
+
+    private CommandFactory.Builder createQueryEventsCommand() {
+        return (request, response) ->
+                new QueryEventsCommand(
+                        QueryEventsAdapter.adapt(request),
+                        QueryEventsAdapter.adaptedOutput(),
+                        eventRepository
+                );
     }
 
     private APIGatewayProxyResponseEvent createResponse(int statusCode, Object body) {
@@ -93,6 +102,7 @@ public class QueryHandler implements RequestHandler<APIGatewayProxyRequestEvent,
                     .withStatusCode(statusCode)
                     .withHeaders(headers)
                     .withBody(objectMapper.writeValueAsString(body));
+
         } catch (Exception e) {
             return new APIGatewayProxyResponseEvent()
                     .withStatusCode(500)

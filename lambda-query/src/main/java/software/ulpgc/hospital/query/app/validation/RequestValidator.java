@@ -13,8 +13,6 @@ public abstract class RequestValidator {
     public abstract void validate(APIGatewayProxyRequestEvent request) throws ValidationException;
 
     protected void validateNext(APIGatewayProxyRequestEvent request) throws ValidationException {
-        if (next != null) {
-            next.validate(request);
-        }
+        if (next != null) next.validate(request);
     }
 }

@@ -1,28 +1,36 @@
 package software.ulpgc.hospital.feeder.domain.validation;
 
-import software.ulpgc.hospital.feeder.app.validator.ValidationRule;
-import software.ulpgc.hospital.model.AdmissionEvent;
+import software.ulpgc.hospital.model.Event;
 
-public class AdmissionEventValidation implements EventValidation<AdmissionEvent> {
-    private ValidationRule<AdmissionEvent> first;
-    private ValidationRule<AdmissionEvent> last;
+public class EventValidation<T extends Event> {
+    private final Class<T> type;
+    private ValidationRule<T> first;
+    private ValidationRule<T> last;
 
-    private AdmissionEventValidation() {
+    private EventValidation(Class<T> type) {
+        this.type = type;
     }
 
-    public static AdmissionEventValidation create() {
-        return new AdmissionEventValidation();
+    public static <T extends Event> EventValidation<T> of(Class<T> type) {
+        return new EventValidation<>(type);
     }
 
-    @Override
-    public void validate(AdmissionEvent event) {
-        this.first.validate(event);
-    }
-
-    public AdmissionEventValidation next(ValidationRule<AdmissionEvent> rule) {
+    public EventValidation<T> next(ValidationRule<T> rule) {
         if (this.first == null) this.first = rule;
         else this.last.setNext(rule);
         this.last = rule;
         return this;
+    }
+
+    public ValidationResult validate(T event) {
+        if (this.first == null) return ValidationResult.success();
+        return this.first.validate(event);
+    }
+
+    public ValidationResult validateEvent(Event event) {
+        if (!type.isInstance(event)) {
+            return ValidationResult.failure("Invalid event type: " + event.getClass().getSimpleName());
+        }
+        return validate(type.cast(event));
     }
 }

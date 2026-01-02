@@ -66,6 +66,7 @@ Resources:
       Environment:
         Variables:
           QUEUE_URL: !Ref EventQueue
+          DEBUG: "false"
 
   # Lambda Ingest
   LambdaIngest:

@@ -1,24 +1,21 @@
-package software.ulpgc.hospital.feeder.app.validator.rules;
+package software.ulpgc.hospital.feeder.domain.validation.consultationRules;
 
-import software.ulpgc.hospital.feeder.app.validator.ValidationRule;
+import software.ulpgc.hospital.feeder.domain.validation.ValidationRule;
 import software.ulpgc.hospital.feeder.domain.validation.ValidationResult;
 import software.ulpgc.hospital.model.ConsultationEvent;
 
-public class ConsultationDurationPositiveRule extends ValidationRule {
-    private final ConsultationEvent event;
-
-    private ConsultationDurationPositiveRule(ConsultationEvent event) {
-        this.event = event;
+public class ConsultationDurationPositiveRule extends ValidationRule<ConsultationEvent> {
+    private ConsultationDurationPositiveRule() {
     }
 
-    public static ConsultationDurationPositiveRule of(ConsultationEvent event) {
-        return new ConsultationDurationPositiveRule(event);
+    public static ConsultationDurationPositiveRule create() {
+        return new ConsultationDurationPositiveRule();
     }
 
     @Override
-    protected ValidationResult check() {
-        return event.consultation().durationMinutes() == null || event.consultation().durationMinutes() <= 0
-            ? ValidationResult.failure("Duration must be positive")
-            : ValidationResult.success();
+    protected ValidationResult check(ConsultationEvent event) {
+        return event.consultationDetails().durationMinutes() == null || event.consultationDetails().durationMinutes() <= 0
+                ? ValidationResult.failure("Duration must be positive")
+                : ValidationResult.success();
     }
 }

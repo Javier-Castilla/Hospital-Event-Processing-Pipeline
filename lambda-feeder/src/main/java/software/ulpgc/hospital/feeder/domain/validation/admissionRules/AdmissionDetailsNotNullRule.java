@@ -1,23 +1,21 @@
-package software.ulpgc.hospital.feeder.app.validator.rules;
+package software.ulpgc.hospital.feeder.domain.validation.admissionRules;
 
-import software.ulpgc.hospital.feeder.app.validator.ValidationRule;
+import software.ulpgc.hospital.feeder.domain.validation.ValidationRule;
 import software.ulpgc.hospital.feeder.domain.validation.ValidationResult;
 import software.ulpgc.hospital.model.AdmissionEvent;
 
-public class AdmissionDetailsNotNullRule extends ValidationRule {
-    private final AdmissionEvent event;
+public class AdmissionDetailsNotNullRule extends ValidationRule<AdmissionEvent> {
 
-    private AdmissionDetailsNotNullRule(AdmissionEvent event) {
-        this.event = event;
+    private AdmissionDetailsNotNullRule() {
     }
 
-    public static AdmissionDetailsNotNullRule of(AdmissionEvent event) {
-        return new AdmissionDetailsNotNullRule(event);
+    public static AdmissionDetailsNotNullRule create() {
+        return new AdmissionDetailsNotNullRule();
     }
 
     @Override
-    protected ValidationResult check() {
-        return event.admission() == null
+    protected ValidationResult check(AdmissionEvent event) {
+        return event.admissionDetails() == null
             ? ValidationResult.failure("Admission details cannot be null")
             : ValidationResult.success();
     }

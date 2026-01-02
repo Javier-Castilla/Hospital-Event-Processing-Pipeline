@@ -1,19 +1,16 @@
-package software.ulpgc.hospital.feeder.app.validator;
+package software.ulpgc.hospital.feeder.domain.validation;
 
-import software.ulpgc.hospital.feeder.domain.validation.ValidationException;
-import software.ulpgc.hospital.feeder.domain.validation.ValidationResult;
-import software.ulpgc.hospital.model.Event;
+public abstract class ValidationRule<T> {
 
-public abstract class ValidationRule<T extends Event> {
     private ValidationRule<T> next;
 
     public ValidationRule(ValidationRule<T> next) {
         this.next = next;
-    };
+    }
 
     public ValidationRule() {
         this.next = null;
-    };
+    }
 
     public ValidationRule<T> setNext(ValidationRule<T> next) {
         this.next = next;
@@ -22,7 +19,8 @@ public abstract class ValidationRule<T extends Event> {
 
     public ValidationResult validate(T event) throws ValidationException {
         ValidationResult result = check(event);
-        if (!result.isValid()) return ValidationResult.failure(result.toString());
+        if (!result.isValid()) return result;
+        if (next == null) return ValidationResult.success();
         return next.validate(event);
     }
 

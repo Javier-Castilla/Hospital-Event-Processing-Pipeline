@@ -1,4 +1,4 @@
-package software.ulpgc.hospital.app.docs;
+package software.ulpgc.hospital.feeder.app.docs;
 
 import java.lang.reflect.RecordComponent;
 import java.sql.Timestamp;

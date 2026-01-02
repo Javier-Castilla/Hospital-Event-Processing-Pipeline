@@ -23,7 +23,8 @@ public class DynamoDatamartRepository implements DatamartRepository {
     public DepartmentStats getOrCreate(String department, String date) throws RepositoryException {
         try {
             Map<String, AttributeValue> key = new HashMap<>();
-            key.put("pk", AttributeValue.builder().s("DEPT#" + department + "#" + date).build());
+            key.put("pk", AttributeValue.builder().s("DEPT#" + department).build());
+            key.put("sk", AttributeValue.builder().s(date).build());
 
             GetItemRequest request = GetItemRequest.builder()
                     .tableName(tableName)
@@ -54,7 +55,8 @@ public class DynamoDatamartRepository implements DatamartRepository {
     public void save(DepartmentStats stats) throws RepositoryException {
         try {
             Map<String, AttributeValue> item = new HashMap<>();
-            item.put("pk", AttributeValue.builder().s(stats.getPartitionKey()).build());
+            item.put("pk", AttributeValue.builder().s("DEPT#" + stats.department()).build());
+            item.put("sk", AttributeValue.builder().s(stats.date().toString()).build());
             item.put("department", AttributeValue.builder().s(stats.department()).build());
             item.put("date", AttributeValue.builder().s(stats.date().toString()).build());
             item.put("totalAdmissions", AttributeValue.builder().n(String.valueOf(stats.totalAdmissions())).build());

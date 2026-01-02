@@ -24,9 +24,7 @@ public class SQSMessagePublisher implements MessagePublisher {
                     .queueUrl(queueUrl)
                     .messageBody(message)
                     .build();
-
             SendMessageResponse response = sqsClient.sendMessage(request);
-
             return new PublishResult(response.messageId(), true);
         } catch (SqsException e) {
             throw new PublishException("Failed to publish message to SQS: " + e.getMessage(), e);

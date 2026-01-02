@@ -46,11 +46,11 @@ public class SimpleDataProcessor implements DataProcessor {
 
     private void updateDatamart(AdmissionEvent admission) throws ProcessException {
         try {
-            String department = admission.department().toString();
+            String department = admission.admissionDetails().department().toString();
             LocalDate date = admission.timestamp().toLocalDateTime().toLocalDate();
 
             DepartmentStats current = datamartRepository.getOrCreate(department, date.toString());
-            DepartmentStats updated = current.incrementAdmission(admission.admissionType());
+            DepartmentStats updated = current.incrementAdmission(admission.admissionDetails().admissionType());
             datamartRepository.save(updated);
         } catch (Exception e) {
             throw new ProcessException("Failed to update datamart", e);

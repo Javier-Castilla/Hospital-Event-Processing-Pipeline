@@ -24,8 +24,17 @@ public class DynamoDatamartRepository implements DatamartRepository {
     @Override
     public DepartmentStats findById(String id) throws RepositoryException {
         try {
+            String[] parts = id.split("#");
+            if (parts.length < 2) {
+                throw new RepositoryException("Invalid id format. Expected: department#date");
+            }
+
+            String department = parts[0];
+            String date = parts[1];
+
             Map<String, AttributeValue> key = new HashMap<>();
-            key.put("pk", AttributeValue.builder().s(id).build());
+            key.put("pk", AttributeValue.builder().s("DEPT#" + department).build());
+            key.put("sk", AttributeValue.builder().s(date).build());
 
             GetItemRequest request = GetItemRequest.builder()
                     .tableName(tableName)
@@ -66,11 +75,9 @@ public class DynamoDatamartRepository implements DatamartRepository {
             }
 
             ScanResponse response = dynamoClient.scan(scanBuilder.build());
-
             return response.items().stream()
                     .map(this::mapToStats)
                     .collect(Collectors.toList());
-
         } catch (Exception e) {
             throw new RepositoryException("Failed to query stats", e);
         }
@@ -79,7 +86,8 @@ public class DynamoDatamartRepository implements DatamartRepository {
     private List<DepartmentStats> queryByDepartmentAndDate(String department, String date) throws RepositoryException {
         try {
             Map<String, AttributeValue> key = new HashMap<>();
-            key.put("pk", AttributeValue.builder().s("DEPT#" + department + "#" + date).build());
+            key.put("pk", AttributeValue.builder().s("DEPT#" + department).build());
+            key.put("sk", AttributeValue.builder().s(date).build());
 
             GetItemRequest request = GetItemRequest.builder()
                     .tableName(tableName)
@@ -141,11 +149,9 @@ public class DynamoDatamartRepository implements DatamartRepository {
 
     private Map<String, String> buildExpressionNames(Map<String, String> filters) {
         Map<String, String> names = new HashMap<>();
-
         if (filters.containsKey("date")) {
             names.put("#d", "date");
         }
-
         return names;
     }
 
