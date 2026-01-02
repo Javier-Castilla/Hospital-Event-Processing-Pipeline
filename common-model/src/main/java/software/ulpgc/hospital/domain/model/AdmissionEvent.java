@@ -1,4 +1,4 @@
-package software.ulpgc.hospital.model;
+package software.ulpgc.hospital.domain.model;
 
 import java.sql.Timestamp;
 import java.util.UUID;

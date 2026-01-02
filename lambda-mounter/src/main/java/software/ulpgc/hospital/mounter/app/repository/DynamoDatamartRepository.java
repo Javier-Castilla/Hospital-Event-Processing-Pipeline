@@ -2,7 +2,7 @@ package software.ulpgc.hospital.mounter.app.repository;
 
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 import software.amazon.awssdk.services.dynamodb.model.*;
-import software.ulpgc.hospital.model.DepartmentStats;
+import software.ulpgc.hospital.domain.model.DepartmentStats;
 import software.ulpgc.hospital.mounter.domain.repository.DatamartRepository;
 import software.ulpgc.hospital.mounter.domain.repository.RepositoryException;
 

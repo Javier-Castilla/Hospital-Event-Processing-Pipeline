@@ -7,8 +7,8 @@ import software.amazon.awssdk.services.s3.model.S3Exception;
 import software.ulpgc.hospital.ingest.domain.storage.EventStorage;
 import software.ulpgc.hospital.ingest.domain.storage.StorageException;
 import software.ulpgc.hospital.ingest.domain.storage.StorageResult;
-import software.ulpgc.hospital.model.Event;
-import software.ulpgc.hospital.model.serialization.EventSerializer;
+import software.ulpgc.hospital.domain.model.Event;
+import software.ulpgc.hospital.domain.model.serialization.EventSerializer;
 
 import java.time.LocalDate;
 import java.time.ZoneOffset;
@@ -25,8 +25,8 @@ public class S3EventStorage implements EventStorage {
     }
 
     @Override
-    public StorageResult store(Event event) throws StorageException {
-        String key = buildS3Key(event);
+    public StorageResult store(Event event, String eventCreationId) throws StorageException {
+        String key = buildS3Key(event, eventCreationId);
         String location = String.format("s3://%s/%s", bucketName, key);
 
         try {
@@ -53,7 +53,7 @@ public class S3EventStorage implements EventStorage {
         }
     }
 
-    private String buildS3Key(Event event) {
+    private String buildS3Key(Event event, String eventCreationId) {
         LocalDate date = event.getTimestamp()
                 .toInstant()
                 .atZone(ZoneOffset.UTC)
@@ -61,7 +61,7 @@ public class S3EventStorage implements EventStorage {
 
         String eventType = event.getClass().getSimpleName().replace("Event", "").toUpperCase();
 
-        return String.format("raw/eventType=%s/date=%s/%s.json",
-                eventType, date, event.getStreamId());
+        return String.format("raw/eventType=%s/date=%s/eventCreationId=%s__id=%s.json",
+                eventType, date, eventCreationId, event.getStreamId());
     }
 }

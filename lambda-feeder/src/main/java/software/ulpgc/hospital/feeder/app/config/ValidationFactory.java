@@ -2,8 +2,8 @@ package software.ulpgc.hospital.feeder.app.config;
 
 import software.ulpgc.hospital.feeder.domain.validation.EventValidation;
 import software.ulpgc.hospital.feeder.domain.validation.ValidationResult;
-import software.ulpgc.hospital.model.Event;
-import software.ulpgc.hospital.model.EventType;
+import software.ulpgc.hospital.domain.model.Event;
+import software.ulpgc.hospital.domain.model.EventType;
 
 import java.util.EnumMap;
 import java.util.Map;

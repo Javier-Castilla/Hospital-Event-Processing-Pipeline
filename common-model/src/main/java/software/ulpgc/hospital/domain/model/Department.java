@@ -1,4 +1,4 @@
-package software.ulpgc.hospital.model;
+package software.ulpgc.hospital.domain.model;
 
 public enum Department {
     EMERGENCY("Emergency"),

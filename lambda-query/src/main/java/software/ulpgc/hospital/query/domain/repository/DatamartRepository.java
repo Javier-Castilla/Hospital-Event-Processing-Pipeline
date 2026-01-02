@@ -1,6 +1,6 @@
 package software.ulpgc.hospital.query.domain.repository;
 
-import software.ulpgc.hospital.model.DepartmentStats;
+import software.ulpgc.hospital.domain.model.DepartmentStats;
 import java.util.List;
 import java.util.Map;
 

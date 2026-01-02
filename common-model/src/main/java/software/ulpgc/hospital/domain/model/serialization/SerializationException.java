@@ -1,4 +1,4 @@
-package software.ulpgc.hospital.model.serialization;
+package software.ulpgc.hospital.domain.model.serialization;
 
 public class SerializationException extends Exception {
     public SerializationException(String message, Throwable cause) {

@@ -4,9 +4,9 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import software.ulpgc.hospital.model.*;
-import software.ulpgc.hospital.model.serialization.EventDeserializer;
-import software.ulpgc.hospital.model.serialization.SerializationException;
+import software.ulpgc.hospital.domain.model.*;
+import software.ulpgc.hospital.domain.model.serialization.EventDeserializer;
+import software.ulpgc.hospital.domain.model.serialization.SerializationException;
 
 import java.sql.Timestamp;
 import java.time.Instant;

@@ -1,8 +1,8 @@
 package software.ulpgc.hospital.mounter.app.processor;
 
-import software.ulpgc.hospital.model.AdmissionEvent;
-import software.ulpgc.hospital.model.DepartmentStats;
-import software.ulpgc.hospital.model.Event;
+import software.ulpgc.hospital.domain.model.AdmissionEvent;
+import software.ulpgc.hospital.domain.model.DepartmentStats;
+import software.ulpgc.hospital.domain.model.Event;
 import software.ulpgc.hospital.mounter.domain.processor.DataProcessor;
 import software.ulpgc.hospital.mounter.domain.processor.ProcessException;
 import software.ulpgc.hospital.mounter.domain.processor.ProcessResult;

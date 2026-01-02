@@ -1,6 +1,6 @@
 package software.ulpgc.hospital.query.domain.control;
 
-import software.ulpgc.hospital.model.DepartmentStats;
+import software.ulpgc.hospital.domain.model.DepartmentStats;
 import software.ulpgc.hospital.query.domain.repository.DatamartRepository;
 import software.ulpgc.hospital.query.domain.repository.RepositoryException;
 

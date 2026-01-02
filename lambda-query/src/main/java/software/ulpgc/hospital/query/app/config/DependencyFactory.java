@@ -4,7 +4,11 @@ import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.ulpgc.hospital.app.implementation.serialization.JacksonEventDeserializer;
-import software.ulpgc.hospital.model.serialization.EventDeserializer;
+import software.ulpgc.hospital.app.stage.repository.DynamoDBEventCreationStatusRepository;
+import software.ulpgc.hospital.app.stage.repository.EventCreationStatusItemMapper;
+import software.ulpgc.hospital.domain.model.serialization.EventDeserializer;
+import software.ulpgc.hospital.domain.stage.eventCreation.EventCreationStatus;
+import software.ulpgc.hospital.domain.stage.repository.EventCreationStatusRepository;
 import software.ulpgc.hospital.query.app.repository.DynamoDatamartRepository;
 import software.ulpgc.hospital.query.app.repository.S3EventRepository;
 import software.ulpgc.hospital.query.domain.repository.DatamartRepository;
@@ -14,9 +18,11 @@ public class DependencyFactory {
     private static DependencyFactory instance;
     private final DatamartRepository datamartRepository;
     private final EventRepository eventRepository;
+    private final EventCreationStatusRepository eventCreationStatusRepository;
 
     private DependencyFactory() {
         String datamartTable = System.getenv("DATAMART_TABLE");
+        String eventStatusTable = System.getenv("STATUS_TABLE_NAME");
         String bucketName = System.getenv("BUCKET_NAME");
         String region = System.getenv("AWS_REGION");
 
@@ -32,6 +38,8 @@ public class DependencyFactory {
 
         this.datamartRepository = new DynamoDatamartRepository(dynamoClient, datamartTable);
         this.eventRepository = new S3EventRepository(s3Client, bucketName, deserializer);
+        DynamoDbClient dynamoDb = DynamoDbClient.builder().build();
+        eventCreationStatusRepository = new DynamoDBEventCreationStatusRepository(dynamoDb, eventStatusTable, new EventCreationStatusItemMapper());
     }
 
     public static synchronized DependencyFactory getInstance() {
@@ -47,5 +55,9 @@ public class DependencyFactory {
 
     public EventRepository getEventRepository() {
         return eventRepository;
+    }
+
+    public EventCreationStatusRepository getEventCreationStatusRepository() {
+        return eventCreationStatusRepository;
     }
 }

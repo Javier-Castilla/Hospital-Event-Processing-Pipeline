@@ -7,9 +7,9 @@ import software.amazon.awssdk.services.s3.model.GetObjectResponse;
 import software.amazon.awssdk.services.s3.model.ListObjectsV2Request;
 import software.amazon.awssdk.services.s3.model.ListObjectsV2Response;
 import software.amazon.awssdk.services.s3.model.S3Object;
-import software.ulpgc.hospital.model.AdmissionEvent;
-import software.ulpgc.hospital.model.Event;
-import software.ulpgc.hospital.model.serialization.EventDeserializer;
+import software.ulpgc.hospital.domain.model.AdmissionEvent;
+import software.ulpgc.hospital.domain.model.Event;
+import software.ulpgc.hospital.domain.model.serialization.EventDeserializer;
 import software.ulpgc.hospital.query.domain.repository.EventRepository;
 import software.ulpgc.hospital.query.domain.repository.RepositoryException;
 

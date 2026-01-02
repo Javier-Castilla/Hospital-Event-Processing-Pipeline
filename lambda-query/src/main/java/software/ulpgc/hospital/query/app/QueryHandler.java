@@ -7,6 +7,8 @@ import com.amazonaws.services.lambda.runtime.events.APIGatewayProxyResponseEvent
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import software.ulpgc.hospital.domain.stage.repository.EventCreationStatusRepository;
+import software.ulpgc.hospital.query.app.adapters.GetEventCreationStatusByIdAdapter;
 import software.ulpgc.hospital.query.app.adapters.GetStatsByIdAdapter;
 import software.ulpgc.hospital.query.app.adapters.QueryEventsAdapter;
 import software.ulpgc.hospital.query.app.adapters.QueryStatsAdapter;
@@ -26,6 +28,7 @@ public class QueryHandler implements RequestHandler<APIGatewayProxyRequestEvent,
     private final ObjectMapper objectMapper;
     private final RequestValidator validationChain;
     private final CommandFactory commandFactory;
+    private final EventCreationStatusRepository eventCreationStatusRepository;
 
     public QueryHandler() {
         DependencyFactory factory = DependencyFactory.getInstance();
@@ -34,11 +37,12 @@ public class QueryHandler implements RequestHandler<APIGatewayProxyRequestEvent,
         this.objectMapper = new ObjectMapper();
         this.objectMapper.registerModule(new JavaTimeModule());
         this.objectMapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
-        this.validationChain = new PathValidator();
+        this.validationChain = PathValidator.withDefaultPaths();
         validationChain.setNext(new MethodValidator())
                 .setNext(new HeaderValidator())
                 .setNext(new QueryValidator());
         this.commandFactory = createCommandFactory();
+        eventCreationStatusRepository = factory.getEventCreationStatusRepository();
     }
 
     @Override
@@ -62,7 +66,17 @@ public class QueryHandler implements RequestHandler<APIGatewayProxyRequestEvent,
         return CommandFactory.create()
                 .register("GET:/events", createQueryEventsCommand())
                 .register("GET:/stats", createQueryStatsCommand())
-                .register("GET:/stats/{id}", createGetStatsByIdCommand());
+                .register("GET:/stats/{id}", createGetStatsByIdCommand())
+                .register("GET:/event-creations/{id}", createGetEventCreationStatusByIdCommand());
+    }
+
+    private CommandFactory.Builder createGetEventCreationStatusByIdCommand() {
+        return (request, response) ->
+                new GetEventCreationStatusByIdCommand(
+                        GetEventCreationStatusByIdAdapter.adapt(request),
+                        GetEventCreationStatusByIdAdapter.adaptedOutput(),
+                        eventCreationStatusRepository
+                );
     }
 
     private CommandFactory.Builder createGetStatsByIdCommand() {

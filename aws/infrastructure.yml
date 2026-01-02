@@ -12,7 +12,6 @@ Parameters:
     Description: Existing S3 DataLake bucket name
 
 Resources:
-  # DynamoDB Datamart Table (Agregaciones)
   DatamartTable:
     Type: AWS::DynamoDB::Table
     Properties:
@@ -32,7 +31,31 @@ Resources:
         - Key: Environment
           Value: !Ref Environment
 
-  # SQS Queue
+  StatusTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub '${AWS::StackName}-event-creation-status'
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: id
+          AttributeType: S
+        - AttributeName: eventId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: id
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: eventId-index
+          KeySchema:
+            - AttributeName: eventId
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+
+
   EventQueue:
     Type: AWS::SQS::Queue
     Properties:
@@ -50,7 +73,6 @@ Resources:
       QueueName: !Sub '${AWS::StackName}-dlq'
       MessageRetentionPeriod: 1209600
 
-  # Lambda Feeder
   LambdaFeeder:
     Type: AWS::Lambda::Function
     Properties:
@@ -67,8 +89,8 @@ Resources:
         Variables:
           QUEUE_URL: !Ref EventQueue
           DEBUG: "false"
+          STATUS_TABLE_NAME: !Ref StatusTable
 
-  # Lambda Ingest
   LambdaIngest:
     Type: AWS::Lambda::Function
     Properties:
@@ -84,6 +106,7 @@ Resources:
       Environment:
         Variables:
           BUCKET_NAME: !Ref DataLakeBucketName
+          STATUS_TABLE_NAME: !Ref StatusTable
 
   LambdaIngestEventSourceMapping:
     Type: AWS::Lambda::EventSourceMapping
@@ -93,7 +116,6 @@ Resources:
       BatchSize: 10
       MaximumBatchingWindowInSeconds: 5
 
-  # Lambda Mounter (Lee de S3 raw/, escribe en DynamoDB)
   LambdaMounter:
     Type: AWS::Lambda::Function
     Properties:
@@ -110,6 +132,7 @@ Resources:
         Variables:
           BUCKET_NAME: !Ref DataLakeBucketName
           TABLE_NAME: !Ref DatamartTable
+          STATUS_TABLE_NAME: !Ref StatusTable
 
   LambdaMounterPermission:
     Type: AWS::Lambda::Permission
@@ -120,7 +143,6 @@ Resources:
       SourceAccount: !Ref AWS::AccountId
       SourceArn: !Sub 'arn:aws:s3:::${DataLakeBucketName}'
 
-  # Lambda Query (Lee de DynamoDB o S3 según endpoint)
   LambdaQuery:
     Type: AWS::Lambda::Function
     Properties:
@@ -137,8 +159,8 @@ Resources:
         Variables:
           DATAMART_TABLE: !Ref DatamartTable
           BUCKET_NAME: !Ref DataLakeBucketName
+          STATUS_TABLE_NAME: !Ref StatusTable
 
-  # REST API Gateway
   RestApiGateway:
     Type: AWS::ApiGateway::RestApi
     Properties:
@@ -148,7 +170,6 @@ Resources:
         Types:
           - REGIONAL
 
-  # API Key
   ApiKey:
     Type: AWS::ApiGateway::ApiKey
     DependsOn: ApiDeployment
@@ -157,7 +178,6 @@ Resources:
       Description: 'API Key for Hospital Event Pipeline'
       Enabled: true
 
-  # Usage Plan
   UsagePlan:
     Type: AWS::ApiGateway::UsagePlan
     DependsOn: ApiDeployment
@@ -178,7 +198,6 @@ Resources:
       KeyType: API_KEY
       UsagePlanId: !Ref UsagePlan
 
-  # Resources
   EventsResource:
     Type: AWS::ApiGateway::Resource
     Properties:
@@ -193,7 +212,20 @@ Resources:
       ParentId: !GetAtt RestApiGateway.RootResourceId
       PathPart: stats
 
-  # /stats/{id} Resource
+  EventCreationsResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref RestApiGateway
+      ParentId: !GetAtt RestApiGateway.RootResourceId
+      PathPart: event-creations
+
+  EventCreationsIdResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref RestApiGateway
+      ParentId: !Ref EventCreationsResource
+      PathPart: '{id}'
+
   StatsIdResource:
     Type: AWS::ApiGateway::Resource
     Properties:
@@ -201,7 +233,45 @@ Resources:
       ParentId: !Ref StatsResource
       PathPart: '{id}'
 
-  # GET /stats/{id}
+  GetEventCreationByIdMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref RestApiGateway
+      ResourceId: !Ref EventCreationsIdResource
+      HttpMethod: GET
+      AuthorizationType: NONE
+      ApiKeyRequired: true
+      RequestParameters:
+        method.request.path.id: true
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${LambdaQuery.Arn}/invocations'
+
+  OptionsEventCreationByIdMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref RestApiGateway
+      ResourceId: !Ref EventCreationsIdResource
+      HttpMethod: OPTIONS
+      AuthorizationType: NONE
+      Integration:
+        Type: MOCK
+        IntegrationResponses:
+          - StatusCode: 200
+            ResponseParameters:
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Api-Key'"
+              method.response.header.Access-Control-Allow-Methods: "'GET,OPTIONS'"
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
+      MethodResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: true
+            method.response.header.Access-Control-Allow-Methods: true
+            method.response.header.Access-Control-Allow-Origin: true
+
   GetStatsByIdMethod:
     Type: AWS::ApiGateway::Method
     Properties:
@@ -219,7 +289,6 @@ Resources:
         RequestParameters:
           integration.request.path.id: method.request.path.id
 
-  # OPTIONS /stats/{id} (CORS)
   OptionsStatsByIdMethod:
     Type: AWS::ApiGateway::Method
     Properties:
@@ -244,7 +313,6 @@ Resources:
             method.response.header.Access-Control-Allow-Methods: true
             method.response.header.Access-Control-Allow-Origin: true
 
-  # POST /events
   PostEventMethod:
     Type: AWS::ApiGateway::Method
     Properties:
@@ -258,7 +326,6 @@ Resources:
         IntegrationHttpMethod: POST
         Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${LambdaFeeder.Arn}/invocations'
 
-  # GET /events (S3 Raw Events)
   GetEventsMethod:
     Type: AWS::ApiGateway::Method
     Properties:
@@ -272,7 +339,6 @@ Resources:
         IntegrationHttpMethod: POST
         Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${LambdaQuery.Arn}/invocations'
 
-  # GET /stats (DynamoDB Aggregations)
   GetStatsMethod:
     Type: AWS::ApiGateway::Method
     Properties:
@@ -286,7 +352,6 @@ Resources:
         IntegrationHttpMethod: POST
         Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${LambdaQuery.Arn}/invocations'
 
-  # OPTIONS CORS
   OptionsEventsMethod:
     Type: AWS::ApiGateway::Method
     Properties:
@@ -335,7 +400,6 @@ Resources:
             method.response.header.Access-Control-Allow-Methods: true
             method.response.header.Access-Control-Allow-Origin: true
 
-  # Lambda Permissions
   LambdaFeederPermission:
     Type: AWS::Lambda::Permission
     Properties:
@@ -352,7 +416,6 @@ Resources:
       Principal: apigateway.amazonaws.com
       SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${RestApiGateway}/*'
 
-  # Deployment
   ApiDeployment:
     Type: AWS::ApiGateway::Deployment
     DependsOn:
@@ -363,10 +426,11 @@ Resources:
       - OptionsEventsMethod
       - OptionsStatsMethod
       - OptionsStatsByIdMethod
+      - GetEventCreationByIdMethod
+      - OptionsEventCreationByIdMethod
     Properties:
       RestApiId: !Ref RestApiGateway
       Description: 'Dual Query Architecture Deployment'
-
 
   ApiStage:
     Type: AWS::ApiGateway::Stage
@@ -384,6 +448,10 @@ Outputs:
   DatamartTableName:
     Description: Datamart DynamoDB table name
     Value: !Ref DatamartTable
+
+  StatusTableName:
+    Description: Event creation status DynamoDB table name
+    Value: !Ref StatusTable
 
   EventQueueUrl:
     Description: SQS Queue URL

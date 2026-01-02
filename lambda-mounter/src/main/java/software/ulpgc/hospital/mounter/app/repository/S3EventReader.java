@@ -6,8 +6,8 @@ import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.model.GetObjectResponse;
 import software.amazon.awssdk.services.s3.model.S3Exception;
-import software.ulpgc.hospital.model.Event;
-import software.ulpgc.hospital.model.serialization.EventDeserializer;
+import software.ulpgc.hospital.domain.model.Event;
+import software.ulpgc.hospital.domain.model.serialization.EventDeserializer;
 import software.ulpgc.hospital.mounter.domain.repository.EventReader;
 import software.ulpgc.hospital.mounter.domain.repository.RepositoryException;
 

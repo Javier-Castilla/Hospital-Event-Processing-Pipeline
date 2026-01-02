@@ -1,6 +1,6 @@
 package software.ulpgc.hospital.query.domain.control;
 
-import software.ulpgc.hospital.model.Event;
+import software.ulpgc.hospital.domain.model.Event;
 import software.ulpgc.hospital.query.domain.repository.EventRepository;
 
 import java.util.List;

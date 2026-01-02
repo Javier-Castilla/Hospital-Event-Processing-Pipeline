@@ -1,6 +1,6 @@
 package software.ulpgc.hospital.feeder.domain.validation;
 
-import software.ulpgc.hospital.model.Event;
+import software.ulpgc.hospital.domain.model.Event;
 
 public class EventValidation<T extends Event> {
     private final Class<T> type;

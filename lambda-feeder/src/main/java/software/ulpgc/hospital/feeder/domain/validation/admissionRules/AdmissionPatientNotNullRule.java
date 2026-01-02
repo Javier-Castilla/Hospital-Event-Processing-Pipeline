@@ -2,7 +2,7 @@ package software.ulpgc.hospital.feeder.domain.validation.admissionRules;
 
 import software.ulpgc.hospital.feeder.domain.validation.ValidationRule;
 import software.ulpgc.hospital.feeder.domain.validation.ValidationResult;
-import software.ulpgc.hospital.model.AdmissionEvent;
+import software.ulpgc.hospital.domain.model.AdmissionEvent;
 
 public class AdmissionPatientNotNullRule extends ValidationRule<AdmissionEvent> {
     private AdmissionPatientNotNullRule() {

@@ -3,9 +3,9 @@ package software.ulpgc.hospital.app.implementation.serialization;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
-import software.ulpgc.hospital.model.Event;
-import software.ulpgc.hospital.model.serialization.EventSerializer;
-import software.ulpgc.hospital.model.serialization.SerializationException;
+import software.ulpgc.hospital.domain.model.Event;
+import software.ulpgc.hospital.domain.model.serialization.EventSerializer;
+import software.ulpgc.hospital.domain.model.serialization.SerializationException;
 
 public class JacksonEventSerializer implements EventSerializer {
     private final ObjectMapper mapper;
