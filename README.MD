@@ -65,4 +65,6 @@ Endpoints (API Key necesaria en HEADERS con clave `x-apy-key`):
 - Si Query devuelve 500: revisa logs de Lambda Query y que las variables de entorno definidas en CloudFormation coincidan con las que lee el código.
 
 ## Autor
+`Javier Castilla Moreno`
 
+License: Academic/Personal Use Only (no redistribution)
