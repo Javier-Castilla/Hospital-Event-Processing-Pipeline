@@ -32,22 +32,67 @@ public class IngestHandler implements RequestHandler<SQSEvent, SQSBatchResponse>
     public SQSBatchResponse handleRequest(SQSEvent event, Context context) {
         context.getLogger().log("Processing records=" + event.getRecords().size() + " requestId=" + context.getAwsRequestId());
         List<SQSBatchResponse.BatchItemFailure> failures = new ArrayList<>();
+
         for (SQSEvent.SQSMessage message : event.getRecords()) {
             String messageId = message.getMessageId();
             try {
                 String body = message.getBody();
                 String payload = extractPayload(body);
                 Map<String, SQSEvent.MessageAttribute> attributes = message.getMessageAttributes();
-                ProcessResult result = eventProcessor.process(payload, mapAttributesToString(attributes));
-                if (result.isSuccess()) updateStored(UUID.fromString(result.getEventId()), result.getStorageLocation());
-                else updateFailed(UUID.fromString(result.getEventId()), "Failed to store event. messageId=" + messageId);
-                if (!result.isSuccess()) failures.add(new SQSBatchResponse.BatchItemFailure(messageId));
+                Map<String, String> attributeMap = mapAttributesToString(attributes);
+
+                String eventIdStr = attributeMap.get("eventId");
+                if (eventIdStr == null) {
+                    context.getLogger().log("Missing eventId in message attributes, messageId=" + messageId);
+                    failures.add(new SQSBatchResponse.BatchItemFailure(messageId));
+                    continue;
+                }
+
+                UUID eventId = UUID.fromString(eventIdStr);
+                UUID eventCreationId = UUID.fromString(attributeMap.get("eventCreationId"));
+
+                Optional<EventCreationStatus> existing = eventCreationStatusRepository.findByEventId(eventId);
+                if (existing.isPresent() && existing.get().stage() == EventCreationStage.STORED) {
+                    context.getLogger().log("Duplicate event detected at Ingest: eventId=" + eventId +
+                            ", existing s3Location=" + existing.get().s3Location());
+                    updateDuplicateSkipped(eventCreationId, "Duplicate event, already stored at: " + existing.get().s3Location());
+                    continue;
+                }
+
+                ProcessResult result = eventProcessor.process(payload, attributeMap);
+
+                if (result.isSuccess()) {
+                    updateStored(eventId, result.getStorageLocation());
+                } else {
+                    updateFailed(eventId, "Failed to store event. messageId=" + messageId);
+                    failures.add(new SQSBatchResponse.BatchItemFailure(messageId));
+                }
+
             } catch (Exception e) {
                 failures.add(new SQSBatchResponse.BatchItemFailure(messageId));
                 context.getLogger().log("Error messageId=" + messageId + " requestId=" + context.getAwsRequestId() + " message=" + e.getMessage());
             }
         }
         return new SQSBatchResponse(failures);
+    }
+
+    private void updateDuplicateSkipped(UUID eventCreationId, String reason) {
+        Optional<EventCreationStatus> currentOpt = eventCreationStatusRepository.findById(eventCreationId);
+        if (currentOpt.isEmpty()) return;
+
+        EventCreationStatus current = currentOpt.get();
+        Instant now = Instant.now();
+        EventCreationStatus updated = new EventCreationStatus(
+                current.id(),
+                current.eventType(),
+                current.eventId(),
+                EventCreationStage.DUPLICATE_SKIPPED,
+                current.createdAt(),
+                now,
+                current.s3Location(),
+                reason
+        );
+        eventCreationStatusRepository.update(updated);
     }
 
     private Map<String, String> mapAttributesToString(Map<String, SQSEvent.MessageAttribute> attributes) {

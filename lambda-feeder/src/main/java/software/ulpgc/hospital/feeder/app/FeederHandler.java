@@ -28,6 +28,7 @@ import software.ulpgc.hospital.domain.model.serialization.SerializationException
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 
 public class FeederHandler implements RequestHandler<APIGatewayProxyRequestEvent, APIGatewayProxyResponseEvent> {
@@ -57,6 +58,17 @@ public class FeederHandler implements RequestHandler<APIGatewayProxyRequestEvent
             if (!validationResult.isValid()) {
                 return createValidationErrorResponse(400, validationResult.getErrorMessage(), event, context);
             }
+
+            UUID eventId = event.getStreamId();
+
+            Optional<EventCreationStatus> existingStatus = eventCreationStatusRepository.findByEventId(eventId);
+
+            if (existingStatus.isPresent()) {
+                context.getLogger().log("Duplicate event detected: eventId=" + eventId +
+                        ", returning existing eventCreationId=" + existingStatus.get().id());
+                return createDuplicateResponse(existingStatus.get());
+            }
+
             UUID eventCreationId = UUID.randomUUID();
             Instant now = Instant.now();
             EventCreationStatus status = new EventCreationStatus(
@@ -70,9 +82,18 @@ public class FeederHandler implements RequestHandler<APIGatewayProxyRequestEvent
                     null
             );
             EventCreationStatus eventCreationStatus = eventCreationStatusRepository.create(status);
+
             String eventJson = serializer.serialize(event);
-            publisher.publish(eventJson, Map.of("eventCreationId", eventCreationStatus.id().toString()));
+            publisher.publish(eventJson, Map.of(
+                    "eventCreationId", eventCreationStatus.id().toString(),
+                    "eventId", eventId.toString()
+            ));
+
+            context.getLogger().log("Event accepted: eventId=" + eventId +
+                    ", eventCreationId=" + eventCreationId);
+
             return createAcceptedResponse(eventCreationId);
+
         } catch (SerializationException e) {
             context.getLogger().log("Deserialization error: " + e.getMessage());
             return createDeserializationErrorResponse(400, e.getMessage(), input.getBody(), context);
@@ -80,6 +101,26 @@ public class FeederHandler implements RequestHandler<APIGatewayProxyRequestEvent
             context.getLogger().log("Error processing event: " + e.getMessage());
             return createInternalErrorResponse(500, context);
         }
+    }
+
+    private APIGatewayProxyResponseEvent createDuplicateResponse(EventCreationStatus existing) {
+        Map<String, String> headers = defaultHeaders("application/json");
+        String baseUrl = System.getenv("BASE_URL");
+        String statusUrl = (baseUrl == null || baseUrl.isBlank())
+                ? "/event-creations/" + existing.id()
+                : baseUrl + "/event-creations/" + existing.id();
+
+        Map<String, Object> body = new HashMap<>();
+        body.put("eventCreationId", existing.id());
+        body.put("statusUrl", statusUrl);
+        body.put("status", existing.stage().name());
+        body.put("deduplication", "feeder");
+        body.put("message", "Event already accepted");
+
+        return new APIGatewayProxyResponseEvent()
+                .withStatusCode(202)
+                .withHeaders(headers)
+                .withBody(toJsonSafe(body));
     }
 
     private APIGatewayProxyResponseEvent createAcceptedResponse(UUID eventCreationId) {
