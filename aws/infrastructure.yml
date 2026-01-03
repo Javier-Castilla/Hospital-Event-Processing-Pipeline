@@ -55,7 +55,6 @@ Resources:
         - Key: Environment
           Value: !Ref Environment
 
-
   EventQueue:
     Type: AWS::SQS::Queue
     Properties:
@@ -169,6 +168,487 @@ Resources:
       EndpointConfiguration:
         Types:
           - REGIONAL
+      Body:
+        openapi: "3.0.1"
+        info:
+          title: "Hospital Event Processing API"
+          description: "Dual Query Architecture - Event ingestion and analytics"
+          version: "1.0"
+
+        paths:
+          /events:
+            post:
+              summary: "Ingest new event"
+              description: "Accepts hospital event and publishes to SQS queue"
+              security:
+                - api_key: []
+              requestBody:
+                required: true
+                content:
+                  application/json:
+                    schema:
+                      oneOf:
+                        - $ref: "#/components/schemas/AdmissionEvent"
+                        - $ref: "#/components/schemas/ConsultationEvent"
+              responses:
+                '202':
+                  description: "Event accepted for processing"
+                '400':
+                  description: "Invalid event format"
+                '500':
+                  description: "Internal server error"
+              x-amazon-apigateway-integration:
+                type: aws_proxy
+                httpMethod: POST
+                uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${LambdaFeeder.Arn}/invocations"
+
+            get:
+              summary: "Query raw events"
+              description: "Retrieve historical events from S3 data lake"
+              security:
+                - api_key: []
+              parameters:
+                - name: eventType
+                  in: query
+                  schema:
+                    $ref: "#/components/schemas/EventType"
+                  description: "Filter by event type"
+                - name: date
+                  in: query
+                  schema:
+                    type: string
+                    format: date
+                  description: "Filter by date (YYYY-MM-DD)"
+              responses:
+                '200':
+                  description: "List of raw events"
+                  content:
+                    application/json:
+                      schema:
+                        type: array
+                        items:
+                          oneOf:
+                            - $ref: "#/components/schemas/AdmissionEvent"
+                            - $ref: "#/components/schemas/ConsultationEvent"
+                '400':
+                  description: "Invalid query parameters"
+                '500':
+                  description: "Internal server error"
+              x-amazon-apigateway-integration:
+                type: aws_proxy
+                httpMethod: POST
+                uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${LambdaQuery.Arn}/invocations"
+
+            options:
+              summary: "CORS support for /events"
+              responses:
+                '200':
+                  description: "CORS preflight"
+                  headers:
+                    Access-Control-Allow-Headers:
+                      schema:
+                        type: string
+                    Access-Control-Allow-Methods:
+                      schema:
+                        type: string
+                    Access-Control-Allow-Origin:
+                      schema:
+                        type: string
+              x-amazon-apigateway-integration:
+                type: mock
+                requestTemplates:
+                  application/json: '{"statusCode":200}'
+                responses:
+                  default:
+                    statusCode: '200'
+                    responseParameters:
+                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,x-api-key'"
+                      method.response.header.Access-Control-Allow-Methods: "'GET,POST,OPTIONS'"
+                      method.response.header.Access-Control-Allow-Origin: "'*'"
+
+          /stats:
+            get:
+              summary: "Query aggregated statistics"
+              description: "Retrieve precalculated metrics from DynamoDB datamart"
+              security:
+                - api_key: []
+              parameters:
+                - name: department
+                  in: query
+                  schema:
+                    $ref: "#/components/schemas/Department"
+                  description: "Filter by department"
+              responses:
+                '200':
+                  description: "Aggregated statistics"
+                  content:
+                    application/json:
+                      schema:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/DepartmentStats"
+                '400':
+                  description: "Invalid query parameters"
+                '500':
+                  description: "Internal server error"
+              x-amazon-apigateway-integration:
+                type: aws_proxy
+                httpMethod: POST
+                uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${LambdaQuery.Arn}/invocations"
+
+            options:
+              summary: "CORS support for /stats"
+              responses:
+                '200':
+                  description: "CORS preflight"
+                  headers:
+                    Access-Control-Allow-Headers:
+                      schema:
+                        type: string
+                    Access-Control-Allow-Methods:
+                      schema:
+                        type: string
+                    Access-Control-Allow-Origin:
+                      schema:
+                        type: string
+              x-amazon-apigateway-integration:
+                type: mock
+                requestTemplates:
+                  application/json: '{"statusCode":200}'
+                responses:
+                  default:
+                    statusCode: '200'
+                    responseParameters:
+                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,x-api-key'"
+                      method.response.header.Access-Control-Allow-Methods: "'GET,OPTIONS'"
+                      method.response.header.Access-Control-Allow-Origin: "'*'"
+
+          /stats/{id}:
+            parameters:
+              - name: id
+                in: path
+                required: true
+                schema:
+                  type: string
+                description: "Unique identifier for stats record"
+            get:
+              summary: "Get specific statistic by ID"
+              description: "Retrieve single stats record from DynamoDB"
+              security:
+                - api_key: []
+              responses:
+                '200':
+                  description: "Stats record found"
+                  content:
+                    application/json:
+                      schema:
+                        $ref: "#/components/schemas/DepartmentStats"
+                '404':
+                  description: "Stats record not found"
+                '400':
+                  description: "Invalid ID format"
+                '500':
+                  description: "Internal server error"
+              x-amazon-apigateway-integration:
+                type: aws_proxy
+                httpMethod: POST
+                uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${LambdaQuery.Arn}/invocations"
+
+            options:
+              summary: "CORS support for /stats/{id}"
+              responses:
+                '200':
+                  description: "CORS preflight"
+                  headers:
+                    Access-Control-Allow-Headers:
+                      schema:
+                        type: string
+                    Access-Control-Allow-Methods:
+                      schema:
+                        type: string
+                    Access-Control-Allow-Origin:
+                      schema:
+                        type: string
+              x-amazon-apigateway-integration:
+                type: mock
+                requestTemplates:
+                  application/json: '{"statusCode":200}'
+                responses:
+                  default:
+                    statusCode: '200'
+                    responseParameters:
+                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,x-api-key'"
+                      method.response.header.Access-Control-Allow-Methods: "'GET,OPTIONS'"
+                      method.response.header.Access-Control-Allow-Origin: "'*'"
+
+          /event-creations/{id}:
+            parameters:
+              - name: id
+                in: path
+                required: true
+                schema:
+                  type: string
+                description: "Event creation ID for tracking"
+            get:
+              summary: "Track event processing status"
+              description: "Retrieve event status from StatusTable (ACCEPTED → QUEUED → PROCESSED → COMPLETED)"
+              security:
+                - api_key: []
+              responses:
+                '200':
+                  description: "Event status found"
+                  content:
+                    application/json:
+                      schema:
+                        $ref: "#/components/schemas/EventStatus"
+                '404':
+                  description: "Event status not found"
+                '400':
+                  description: "Invalid ID format"
+                '500':
+                  description: "Internal server error"
+              x-amazon-apigateway-integration:
+                type: aws_proxy
+                httpMethod: POST
+                uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${LambdaQuery.Arn}/invocations"
+
+            options:
+              summary: "CORS support for /event-creations/{id}"
+              responses:
+                '200':
+                  description: "CORS preflight"
+                  headers:
+                    Access-Control-Allow-Headers:
+                      schema:
+                        type: string
+                    Access-Control-Allow-Methods:
+                      schema:
+                        type: string
+                    Access-Control-Allow-Origin:
+                      schema:
+                        type: string
+              x-amazon-apigateway-integration:
+                type: mock
+                requestTemplates:
+                  application/json: '{"statusCode":200}'
+                responses:
+                  default:
+                    statusCode: '200'
+                    responseParameters:
+                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,x-api-key'"
+                      method.response.header.Access-Control-Allow-Methods: "'GET,OPTIONS'"
+                      method.response.header.Access-Control-Allow-Origin: "'*'"
+
+        components:
+          securitySchemes:
+            api_key:
+              type: apiKey
+              name: x-api-key
+              in: header
+
+          schemas:
+            AdmissionEvent:
+              type: object
+              properties:
+                id:
+                  type: string
+                  format: uuid
+                patient:
+                  $ref: "#/components/schemas/PatientSnapshot"
+                admissionDetails:
+                  $ref: "#/components/schemas/AdmissionDetails"
+                timestamp:
+                  type: string
+                  format: date-time
+              required:
+                - id
+                - patient
+                - admissionDetails
+                - timestamp
+
+            ConsultationEvent:
+              type: object
+              properties:
+                id:
+                  type: string
+                  format: uuid
+                patient:
+                  $ref: "#/components/schemas/PatientSnapshot"
+                doctor:
+                  $ref: "#/components/schemas/DoctorSnapshot"
+                consultationDetails:
+                  $ref: "#/components/schemas/ConsultationDetails"
+                timestamp:
+                  type: string
+                  format: date-time
+              required:
+                - id
+                - patient
+                - doctor
+                - consultationDetails
+                - timestamp
+
+            PatientSnapshot:
+              type: object
+              properties:
+                patientId:
+                  type: string
+                  format: uuid
+                name:
+                  type: string
+                surname:
+                  type: string
+                age:
+                  type: integer
+                gender:
+                  type: string
+                nationalId:
+                  type: string
+              required:
+                - patientId
+                - name
+                - surname
+                - age
+                - gender
+                - nationalId
+
+            DoctorSnapshot:
+              type: object
+              properties:
+                doctorId:
+                  type: string
+                  format: uuid
+                name:
+                  type: string
+                specialization:
+                  type: string
+              required:
+                - doctorId
+                - name
+                - specialization
+
+            AdmissionDetails:
+              type: object
+              properties:
+                department:
+                  $ref: "#/components/schemas/Department"
+                admissionType:
+                  $ref: "#/components/schemas/AdmissionType"
+                bedNumber:
+                  type: string
+                ward:
+                  type: string
+                attendingPhysician:
+                  type: string
+                initialDiagnosis:
+                  type: string
+              required:
+                - department
+                - admissionType
+
+            ConsultationDetails:
+              type: object
+              properties:
+                department:
+                  $ref: "#/components/schemas/Department"
+                consultationType:
+                  $ref: "#/components/schemas/ConsultationType"
+                reason:
+                  type: string
+                diagnosis:
+                  type: string
+                treatment:
+                  type: string
+                prescriptions:
+                  type: string
+                durationMinutes:
+                  type: integer
+                notes:
+                  type: string
+              required:
+                - department
+                - consultationType
+
+            DepartmentStats:
+              type: object
+              properties:
+                department:
+                  type: string
+                date:
+                  type: string
+                  format: date
+                totalAdmissions:
+                  type: integer
+                emergencyAdmissions:
+                  type: integer
+                scheduledAdmissions:
+                  type: integer
+                transferAdmissions:
+                  type: integer
+              required:
+                - department
+                - date
+                - totalAdmissions
+                - emergencyAdmissions
+                - scheduledAdmissions
+                - transferAdmissions
+
+            EventStatus:
+              type: object
+              properties:
+                id:
+                  type: string
+                eventId:
+                  type: string
+                stage:
+                  type: string
+                  enum: [ACCEPTED, QUEUED, PROCESSED, COMPLETED]
+                createdAt:
+                  type: string
+                  format: date-time
+                updatedAt:
+                  type: string
+                  format: date-time
+
+            EventType:
+              type: string
+              enum:
+                - ADMISSION
+                - CONSULTATION
+                - LAB_RESULT
+                - MEDICATION
+
+            Department:
+              type: string
+              enum:
+                - EMERGENCY
+                - CARDIOLOGY
+                - TRAUMATOLOGY
+                - NEUROLOGY
+                - PEDIATRICS
+                - ICU
+                - ONCOLOGY
+                - GYNECOLOGY
+                - GENERAL_SURGERY
+                - INTERNAL_MEDICINE
+                - RADIOLOGY
+                - LABORATORY
+
+            AdmissionType:
+              type: string
+              enum:
+                - EMERGENCY
+                - SCHEDULED
+                - TRANSFER
+
+            ConsultationType:
+              type: string
+              enum:
+                - FIRST_VISIT
+                - FOLLOW_UP
+                - URGENT
+                - ROUTINE_CHECKUP
+                - POST_OPERATIVE
 
   ApiKey:
     Type: AWS::ApiGateway::ApiKey
@@ -198,215 +678,13 @@ Resources:
       KeyType: API_KEY
       UsagePlanId: !Ref UsagePlan
 
-  EventsResource:
-    Type: AWS::ApiGateway::Resource
-    Properties:
-      RestApiId: !Ref RestApiGateway
-      ParentId: !GetAtt RestApiGateway.RootResourceId
-      PathPart: events
-
-  StatsResource:
-    Type: AWS::ApiGateway::Resource
-    Properties:
-      RestApiId: !Ref RestApiGateway
-      ParentId: !GetAtt RestApiGateway.RootResourceId
-      PathPart: stats
-
-  EventCreationsResource:
-    Type: AWS::ApiGateway::Resource
-    Properties:
-      RestApiId: !Ref RestApiGateway
-      ParentId: !GetAtt RestApiGateway.RootResourceId
-      PathPart: event-creations
-
-  EventCreationsIdResource:
-    Type: AWS::ApiGateway::Resource
-    Properties:
-      RestApiId: !Ref RestApiGateway
-      ParentId: !Ref EventCreationsResource
-      PathPart: '{id}'
-
-  StatsIdResource:
-    Type: AWS::ApiGateway::Resource
-    Properties:
-      RestApiId: !Ref RestApiGateway
-      ParentId: !Ref StatsResource
-      PathPart: '{id}'
-
-  GetEventCreationByIdMethod:
-    Type: AWS::ApiGateway::Method
-    Properties:
-      RestApiId: !Ref RestApiGateway
-      ResourceId: !Ref EventCreationsIdResource
-      HttpMethod: GET
-      AuthorizationType: NONE
-      ApiKeyRequired: true
-      RequestParameters:
-        method.request.path.id: true
-      Integration:
-        Type: AWS_PROXY
-        IntegrationHttpMethod: POST
-        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${LambdaQuery.Arn}/invocations'
-
-  OptionsEventCreationByIdMethod:
-    Type: AWS::ApiGateway::Method
-    Properties:
-      RestApiId: !Ref RestApiGateway
-      ResourceId: !Ref EventCreationsIdResource
-      HttpMethod: OPTIONS
-      AuthorizationType: NONE
-      Integration:
-        Type: MOCK
-        IntegrationResponses:
-          - StatusCode: 200
-            ResponseParameters:
-              method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Api-Key'"
-              method.response.header.Access-Control-Allow-Methods: "'GET,OPTIONS'"
-              method.response.header.Access-Control-Allow-Origin: "'*'"
-        RequestTemplates:
-          application/json: '{"statusCode": 200}'
-      MethodResponses:
-        - StatusCode: 200
-          ResponseParameters:
-            method.response.header.Access-Control-Allow-Headers: true
-            method.response.header.Access-Control-Allow-Methods: true
-            method.response.header.Access-Control-Allow-Origin: true
-
-  GetStatsByIdMethod:
-    Type: AWS::ApiGateway::Method
-    Properties:
-      RestApiId: !Ref RestApiGateway
-      ResourceId: !Ref StatsIdResource
-      HttpMethod: GET
-      AuthorizationType: NONE
-      ApiKeyRequired: true
-      RequestParameters:
-        method.request.path.id: true
-      Integration:
-        Type: AWS_PROXY
-        IntegrationHttpMethod: POST
-        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${LambdaQuery.Arn}/invocations'
-        RequestParameters:
-          integration.request.path.id: method.request.path.id
-
-  OptionsStatsByIdMethod:
-    Type: AWS::ApiGateway::Method
-    Properties:
-      RestApiId: !Ref RestApiGateway
-      ResourceId: !Ref StatsIdResource
-      HttpMethod: OPTIONS
-      AuthorizationType: NONE
-      Integration:
-        Type: MOCK
-        IntegrationResponses:
-          - StatusCode: 200
-            ResponseParameters:
-              method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Api-Key'"
-              method.response.header.Access-Control-Allow-Methods: "'GET,OPTIONS'"
-              method.response.header.Access-Control-Allow-Origin: "'*'"
-        RequestTemplates:
-          application/json: '{"statusCode": 200}'
-      MethodResponses:
-        - StatusCode: 200
-          ResponseParameters:
-            method.response.header.Access-Control-Allow-Headers: true
-            method.response.header.Access-Control-Allow-Methods: true
-            method.response.header.Access-Control-Allow-Origin: true
-
-  PostEventMethod:
-    Type: AWS::ApiGateway::Method
-    Properties:
-      RestApiId: !Ref RestApiGateway
-      ResourceId: !Ref EventsResource
-      HttpMethod: POST
-      AuthorizationType: NONE
-      ApiKeyRequired: true
-      Integration:
-        Type: AWS_PROXY
-        IntegrationHttpMethod: POST
-        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${LambdaFeeder.Arn}/invocations'
-
-  GetEventsMethod:
-    Type: AWS::ApiGateway::Method
-    Properties:
-      RestApiId: !Ref RestApiGateway
-      ResourceId: !Ref EventsResource
-      HttpMethod: GET
-      AuthorizationType: NONE
-      ApiKeyRequired: true
-      Integration:
-        Type: AWS_PROXY
-        IntegrationHttpMethod: POST
-        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${LambdaQuery.Arn}/invocations'
-
-  GetStatsMethod:
-    Type: AWS::ApiGateway::Method
-    Properties:
-      RestApiId: !Ref RestApiGateway
-      ResourceId: !Ref StatsResource
-      HttpMethod: GET
-      AuthorizationType: NONE
-      ApiKeyRequired: true
-      Integration:
-        Type: AWS_PROXY
-        IntegrationHttpMethod: POST
-        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${LambdaQuery.Arn}/invocations'
-
-  OptionsEventsMethod:
-    Type: AWS::ApiGateway::Method
-    Properties:
-      RestApiId: !Ref RestApiGateway
-      ResourceId: !Ref EventsResource
-      HttpMethod: OPTIONS
-      AuthorizationType: NONE
-      Integration:
-        Type: MOCK
-        IntegrationResponses:
-          - StatusCode: 200
-            ResponseParameters:
-              method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Api-Key'"
-              method.response.header.Access-Control-Allow-Methods: "'GET,POST,OPTIONS'"
-              method.response.header.Access-Control-Allow-Origin: "'*'"
-        RequestTemplates:
-          application/json: '{"statusCode": 200}'
-      MethodResponses:
-        - StatusCode: 200
-          ResponseParameters:
-            method.response.header.Access-Control-Allow-Headers: true
-            method.response.header.Access-Control-Allow-Methods: true
-            method.response.header.Access-Control-Allow-Origin: true
-
-  OptionsStatsMethod:
-    Type: AWS::ApiGateway::Method
-    Properties:
-      RestApiId: !Ref RestApiGateway
-      ResourceId: !Ref StatsResource
-      HttpMethod: OPTIONS
-      AuthorizationType: NONE
-      Integration:
-        Type: MOCK
-        IntegrationResponses:
-          - StatusCode: 200
-            ResponseParameters:
-              method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Api-Key'"
-              method.response.header.Access-Control-Allow-Methods: "'GET,OPTIONS'"
-              method.response.header.Access-Control-Allow-Origin: "'*'"
-        RequestTemplates:
-          application/json: '{"statusCode": 200}'
-      MethodResponses:
-        - StatusCode: 200
-          ResponseParameters:
-            method.response.header.Access-Control-Allow-Headers: true
-            method.response.header.Access-Control-Allow-Methods: true
-            method.response.header.Access-Control-Allow-Origin: true
-
   LambdaFeederPermission:
     Type: AWS::Lambda::Permission
     Properties:
       FunctionName: !Ref LambdaFeeder
       Action: lambda:InvokeFunction
       Principal: apigateway.amazonaws.com
-      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${RestApiGateway}/*'
+      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${RestApiGateway}/*/*/events'
 
   LambdaQueryPermission:
     Type: AWS::Lambda::Permission
@@ -414,23 +692,13 @@ Resources:
       FunctionName: !Ref LambdaQuery
       Action: lambda:InvokeFunction
       Principal: apigateway.amazonaws.com
-      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${RestApiGateway}/*'
+      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${RestApiGateway}/*/*'
 
   ApiDeployment:
     Type: AWS::ApiGateway::Deployment
-    DependsOn:
-      - PostEventMethod
-      - GetEventsMethod
-      - GetStatsMethod
-      - GetStatsByIdMethod
-      - OptionsEventsMethod
-      - OptionsStatsMethod
-      - OptionsStatsByIdMethod
-      - GetEventCreationByIdMethod
-      - OptionsEventCreationByIdMethod
     Properties:
       RestApiId: !Ref RestApiGateway
-      Description: 'Dual Query Architecture Deployment'
+      Description: 'OpenAPI Deployment - Dual Query Architecture'
 
   ApiStage:
     Type: AWS::ApiGateway::Stage
